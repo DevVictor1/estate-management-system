@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 function ProtectedRoute() {
-  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const { user, loading, logout } = useAuth();
   const [providerStatusLoading, setProviderStatusLoading] = useState(true);
   const [isApprovedServiceProvider, setIsApprovedServiceProvider] =
     useState(true);
   const [providerStatusError, setProviderStatusError] = useState("");
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   useEffect(() => {
     const checkServiceProviderApproval = async () => {
@@ -103,15 +109,31 @@ function ProtectedRoute() {
             Your service provider account is pending review
           </h1>
           <p style={{ color: "#64748b", lineHeight: 1.7 }}>
-            Your registration was received successfully. An administrator needs
-            to approve your service provider profile before you can access the
-            dashboard.
+            Your registration was received successfully. Your service provider
+            account is waiting for estate manager approval before you can
+            access the dashboard.
           </p>
           {providerStatusError ? (
             <p style={{ marginTop: "14px", color: "#b91c1c" }}>
               {providerStatusError}
             </p>
           ) : null}
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              marginTop: "24px",
+              padding: "12px 20px",
+              border: "none",
+              borderRadius: "12px",
+              background: "#0b1f3a",
+              color: "#ffffff",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
         </div>
       </div>
     );
