@@ -8,6 +8,7 @@ const initialFormData = {
   phone: "",
   serviceCategory: "security",
   address: "",
+  verificationStatus: "pending",
 };
 
 function ServiceProviders() {
@@ -62,6 +63,7 @@ function ServiceProviders() {
       phone: provider.phone || "",
       serviceCategory: provider.serviceCategory || "security",
       address: provider.address || "",
+      verificationStatus: provider.verificationStatus || "pending",
     });
   };
 
@@ -87,6 +89,30 @@ function ServiceProviders() {
     } catch (err) {
       setError(
         err.response?.data?.message || "Failed to delete service provider."
+      );
+    }
+  };
+
+  const handleVerificationUpdate = async (providerId, verificationStatus) => {
+    setError("");
+
+    try {
+      await api.put(`/api/service-providers/${providerId}`, {
+        verificationStatus,
+      });
+
+      if (editingProviderId === providerId) {
+        setFormData((currentData) => ({
+          ...currentData,
+          verificationStatus,
+        }));
+      }
+
+      await fetchProviders();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          `Failed to mark provider as ${verificationStatus}.`
       );
     }
   };
@@ -143,7 +169,7 @@ function ServiceProviders() {
       <div style={{ marginBottom: "24px" }}>
         <h1 style={{ marginBottom: "8px" }}>Service Providers</h1>
         <p style={{ color: "#6b7a90" }}>
-          Manage registered service providers and view current verification
+          Manage registered service providers and review their verification
           status.
         </p>
       </div>
@@ -160,36 +186,28 @@ function ServiceProviders() {
 
       <div className="provider-filters">
         <div className="provider-filter-group">
-          <label
-            className="provider-filter-label"
-            htmlFor="providerSearch"
-          >
+          <label className="provider-filter-label" htmlFor="providerSearch">
             Search Providers
           </label>
           <input
-            className="provider-filter-control"
             id="providerSearch"
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Search by company, contact, email, or phone"
-            style={filterInputStyle}
+            className="provider-filter-control"
           />
         </div>
 
         <div className="provider-filter-group">
-          <label
-            className="provider-filter-label"
-            htmlFor="categoryFilter"
-          >
+          <label className="provider-filter-label" htmlFor="categoryFilter">
             Service Category
           </label>
           <select
-            className="provider-filter-control"
             id="categoryFilter"
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
-            style={filterInputStyle}
+            className="provider-filter-control"
           >
             <option value="">All Categories</option>
             <option value="security">Security</option>
@@ -202,18 +220,14 @@ function ServiceProviders() {
         </div>
 
         <div className="provider-filter-group">
-          <label
-            className="provider-filter-label"
-            htmlFor="statusFilter"
-          >
+          <label className="provider-filter-label" htmlFor="statusFilter">
             Verification Status
           </label>
           <select
-            className="provider-filter-control"
             id="statusFilter"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            style={filterInputStyle}
+            className="provider-filter-control"
           >
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
@@ -338,6 +352,27 @@ function ServiceProviders() {
 
         <div>
           <label
+            htmlFor="verificationStatus"
+            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+          >
+            Verification Status
+          </label>
+          <select
+            id="verificationStatus"
+            name="verificationStatus"
+            value={formData.verificationStatus}
+            onChange={handleChange}
+            required
+            style={inputStyle}
+          >
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+
+        <div style={{ gridColumn: "1 / -1" }}>
+          <label
             htmlFor="address"
             style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
           >
@@ -440,7 +475,17 @@ function ServiceProviders() {
                   <td style={cellStyle}>{provider.phone}</td>
                   <td style={cellStyle}>{provider.serviceCategory}</td>
                   <td style={cellStyle}>{provider.address || "-"}</td>
-                  <td style={cellStyle}>{provider.verificationStatus}</td>
+                  <td style={cellStyle}>
+                    <span
+                      style={{
+                        ...verificationBadgeStyles.base,
+                        ...(verificationBadgeStyles[provider.verificationStatus] ||
+                          verificationBadgeStyles.pending),
+                      }}
+                    >
+                      {provider.verificationStatus}
+                    </span>
+                  </td>
                   <td style={cellStyle}>
                     <div
                       style={{
@@ -456,6 +501,38 @@ function ServiceProviders() {
                       >
                         Edit
                       </button>
+                      {provider.verificationStatus !== "approved" ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleVerificationUpdate(provider._id, "approved")
+                          }
+                          style={{
+                            ...actionButtonStyle,
+                            background: "#dcfce7",
+                            color: "#166534",
+                            borderColor: "#86efac",
+                          }}
+                        >
+                          Approve
+                        </button>
+                      ) : null}
+                      {provider.verificationStatus !== "rejected" ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleVerificationUpdate(provider._id, "rejected")
+                          }
+                          style={{
+                            ...actionButtonStyle,
+                            background: "#fee2e2",
+                            color: "#b91c1c",
+                            borderColor: "#fca5a5",
+                          }}
+                        >
+                          Reject
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => handleDelete(provider._id)}
@@ -501,11 +578,6 @@ const inputStyle = {
   outline: "none",
 };
 
-const filterInputStyle = {
-  ...inputStyle,
-  height: "48px",
-};
-
 const cellStyle = {
   padding: "14px",
   borderBottom: "1px solid #eef2f7",
@@ -519,6 +591,30 @@ const actionButtonStyle = {
   background: "#ffffff",
   color: "#14213d",
   cursor: "pointer",
+};
+
+const verificationBadgeStyles = {
+  base: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    fontSize: "0.85rem",
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  pending: {
+    background: "#fff4cc",
+    color: "#9a6700",
+  },
+  approved: {
+    background: "#dcfce7",
+    color: "#166534",
+  },
+  rejected: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+  },
 };
 
 export default ServiceProviders;

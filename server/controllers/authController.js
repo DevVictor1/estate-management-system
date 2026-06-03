@@ -1,5 +1,15 @@
 const jwt = require("jsonwebtoken");
+const ServiceProvider = require("../models/ServiceProvider");
 const User = require("../models/User");
+
+const allowedServiceCategories = [
+  "security",
+  "cleaning",
+  "waste_management",
+  "landscaping",
+  "maintenance",
+  "other",
+];
 
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -17,7 +27,13 @@ const registerUser = async (req, res) => {
       role,
       estateName,
       apartmentNumber,
+      serviceCategory,
+      customServiceCategory,
+      address,
     } = req.body;
+
+    // Admin accounts must never be created through the public registration flow.
+    const safeRole = role === "service_provider" ? "service_provider" : "resident";
 
     const existingUser = await User.findOne({ email });
 
@@ -33,10 +49,40 @@ const registerUser = async (req, res) => {
       email,
       phone,
       password,
-      role,
+      role: safeRole,
       estateName,
       apartmentNumber,
     });
+
+    if (safeRole === "service_provider") {
+      try {
+        const safeServiceCategory = allowedServiceCategories.includes(serviceCategory)
+          ? serviceCategory
+          : "other";
+
+        // Service provider accounts start in a pending state until an admin approves them.
+        await ServiceProvider.create({
+          companyName: fullName,
+          contactPerson: fullName,
+          email,
+          phone,
+          serviceCategory: safeServiceCategory,
+          address,
+          verificationStatus: "pending",
+          notes:
+            safeServiceCategory === "other" && customServiceCategory
+              ? customServiceCategory
+              : undefined,
+        });
+      } catch (providerError) {
+        await User.findByIdAndDelete(user._id);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to complete service provider registration",
+        });
+      }
+    }
 
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({
@@ -70,7 +116,6 @@ const registerUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to register user",
-      error: error.message,
     });
   }
 };
