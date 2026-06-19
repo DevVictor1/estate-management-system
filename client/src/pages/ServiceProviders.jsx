@@ -24,6 +24,8 @@ function ServiceProviders() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isAdmin = user?.role === "admin";
+  const isResident = user?.role === "resident";
+  const isServiceProvider = user?.role === "service_provider";
 
   const resetForm = () => {
     setFormData(initialFormData);
@@ -146,19 +148,42 @@ function ServiceProviders() {
     }
   };
 
-  const filteredProviders = providers.filter((provider) => {
+  const roleScopedProviders = providers.filter((provider) => {
+    if (isAdmin) {
+      return true;
+    }
+
+    if (isResident) {
+      return provider.verificationStatus === "approved";
+    }
+
+    if (isServiceProvider) {
+      return (
+        provider.email &&
+        user?.email &&
+        provider.email.toLowerCase() === user.email.toLowerCase()
+      );
+    }
+
+    return false;
+  });
+
+  const filteredProviders = roleScopedProviders.filter((provider) => {
     const searchValue = searchTerm.trim().toLowerCase();
     const matchesSearch =
       !searchValue ||
       provider.companyName?.toLowerCase().includes(searchValue) ||
       provider.contactPerson?.toLowerCase().includes(searchValue) ||
-      provider.email?.toLowerCase().includes(searchValue) ||
+      (isAdmin || isServiceProvider
+        ? provider.email?.toLowerCase().includes(searchValue)
+        : false) ||
       provider.phone?.toLowerCase().includes(searchValue);
 
     const matchesCategory =
       !categoryFilter || provider.serviceCategory === categoryFilter;
     const matchesStatus =
-      !statusFilter || provider.verificationStatus === statusFilter;
+      !statusFilter ||
+      (!isResident && provider.verificationStatus === statusFilter);
 
     return matchesSearch && matchesCategory && matchesStatus;
   });
@@ -193,6 +218,18 @@ function ServiceProviders() {
         </p>
       ) : null}
 
+      {isResident ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          Showing approved service providers only.
+        </p>
+      ) : null}
+
+      {isServiceProvider ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          Showing your provider profile only.
+        </p>
+      ) : null}
+
       <div className="provider-filters">
         <div className="provider-filter-group">
           <label className="provider-filter-label" htmlFor="providerSearch">
@@ -203,7 +240,11 @@ function ServiceProviders() {
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search by company, contact, email, or phone"
+            placeholder={
+              isAdmin || isServiceProvider
+                ? "Search by company, contact, email, or phone"
+                : "Search by company, contact, or phone"
+            }
             className="provider-filter-control"
           />
         </div>
@@ -228,26 +269,28 @@ function ServiceProviders() {
           </select>
         </div>
 
-        <div className="provider-filter-group">
-          <label className="provider-filter-label" htmlFor="statusFilter">
-            Verification Status
-          </label>
-          <select
-            id="statusFilter"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            className="provider-filter-control"
-          >
-            <option value="">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
+        {!isResident ? (
+          <div className="provider-filter-group">
+            <label className="provider-filter-label" htmlFor="statusFilter">
+              Verification Status
+            </label>
+            <select
+              id="statusFilter"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="provider-filter-control"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+        ) : null}
       </div>
 
       <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredProviders.length} of {providers.length} service
+        Showing {filteredProviders.length} of {roleScopedProviders.length} service
         providers
       </p>
 
@@ -456,11 +499,11 @@ function ServiceProviders() {
               {[
                 "Company",
                 "Contact Person",
-                "Email",
                 "Phone",
                 "Category",
                 "Address",
-                "Status",
+                ...(isAdmin || isServiceProvider ? ["Email"] : []),
+                ...(isAdmin || isServiceProvider ? ["Status"] : []),
                 ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
@@ -482,21 +525,25 @@ function ServiceProviders() {
                 <tr key={provider._id}>
                   <td style={cellStyle}>{provider.companyName}</td>
                   <td style={cellStyle}>{provider.contactPerson}</td>
-                  <td style={cellStyle}>{provider.email || "-"}</td>
                   <td style={cellStyle}>{provider.phone}</td>
                   <td style={cellStyle}>{provider.serviceCategory}</td>
                   <td style={cellStyle}>{provider.address || "-"}</td>
-                  <td style={cellStyle}>
-                    <span
-                      style={{
-                        ...verificationBadgeStyles.base,
-                        ...(verificationBadgeStyles[provider.verificationStatus] ||
-                          verificationBadgeStyles.pending),
-                      }}
-                    >
-                      {provider.verificationStatus}
-                    </span>
-                  </td>
+                  {isAdmin || isServiceProvider ? (
+                    <td style={cellStyle}>{provider.email || "-"}</td>
+                  ) : null}
+                  {isAdmin || isServiceProvider ? (
+                    <td style={cellStyle}>
+                      <span
+                        style={{
+                          ...verificationBadgeStyles.base,
+                          ...(verificationBadgeStyles[provider.verificationStatus] ||
+                            verificationBadgeStyles.pending),
+                        }}
+                      >
+                        {provider.verificationStatus}
+                      </span>
+                    </td>
+                  ) : null}
                   {isAdmin ? (
                     <td style={cellStyle}>
                       <div
@@ -565,7 +612,7 @@ function ServiceProviders() {
             ) : (
               <tr>
                 <td
-                  colSpan={isAdmin ? "8" : "7"}
+                  colSpan={isAdmin ? "8" : isServiceProvider ? "7" : "5"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
