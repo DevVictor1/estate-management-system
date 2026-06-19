@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const initialFormData = {
@@ -13,6 +14,7 @@ const initialFormData = {
 };
 
 function Contracts() {
+  const { user } = useAuth();
   const [contracts, setContracts] = useState([]);
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
@@ -24,6 +26,7 @@ function Contracts() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isAdmin = user?.role === "admin";
 
   const resetForm = () => {
     setFormData({
@@ -192,6 +195,12 @@ function Contracts() {
         </p>
       ) : null}
 
+      {!isAdmin ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You have view-only access on this page.
+        </p>
+      ) : null}
+
       <div className="filter-card">
         <div className="filter-grid">
           <div className="filter-group">
@@ -258,19 +267,20 @@ function Contracts() {
         Showing {filteredContracts.length} of {contracts.length} contracts
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          padding: "20px",
-          marginBottom: "24px",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
+      {isAdmin ? (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            border: "1px solid #d9e2ec",
+            borderRadius: "14px",
+          }}
+        >
         <div>
           <label
             htmlFor="serviceProvider"
@@ -464,7 +474,8 @@ function Contracts() {
             </button>
           ) : null}
         </div>
-      </form>
+        </form>
+      ) : null}
 
       <div
         style={{
@@ -486,7 +497,7 @@ function Contracts() {
                 "Contract Value",
                 "Status",
                 "Notes",
-                "Actions",
+                ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -523,41 +534,43 @@ function Contracts() {
                   <td style={cellStyle}>{contract.contractValue}</td>
                   <td style={cellStyle}>{contract.status}</td>
                   <td style={cellStyle}>{contract.notes || "-"}</td>
-                  <td style={cellStyle}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(contract)}
-                        style={actionButtonStyle}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(contract._id)}
+                  {isAdmin ? (
+                    <td style={cellStyle}>
+                      <div
                         style={{
-                          ...actionButtonStyle,
-                          background: "#c1121f",
-                          color: "#ffffff",
-                          borderColor: "#c1121f",
+                          display: "flex",
+                          gap: "8px",
+                          flexWrap: "wrap",
                         }}
                       >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(contract)}
+                          style={actionButtonStyle}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(contract._id)}
+                          style={{
+                            ...actionButtonStyle,
+                            background: "#c1121f",
+                            color: "#ffffff",
+                            borderColor: "#c1121f",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="9"
+                  colSpan={isAdmin ? "9" : "8"}
                   style={{
                     padding: "18px",
                     textAlign: "center",

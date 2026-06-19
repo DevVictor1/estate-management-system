@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const initialFormData = {
@@ -11,6 +12,7 @@ const initialFormData = {
 };
 
 function Tasks() {
+  const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
@@ -21,6 +23,15 @@ function Tasks() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isAdmin = user?.role === "admin";
+  const isResident = user?.role === "resident";
+  const isServiceProvider = user?.role === "service_provider";
+
+  const canServiceProviderUpdateTask = (task) =>
+    isServiceProvider &&
+    task.serviceProvider?.email &&
+    user?.email &&
+    task.serviceProvider.email.toLowerCase() === user.email.toLowerCase();
 
   const resetForm = () => {
     setFormData({
@@ -69,6 +80,10 @@ function Tasks() {
   };
 
   const handleEdit = (task) => {
+    if (isServiceProvider && !canServiceProviderUpdateTask(task)) {
+      return;
+    }
+
     setError("");
     setEditingTaskId(task._id);
     setFormData({
@@ -114,7 +129,10 @@ function Tasks() {
 
     try {
       if (editingTaskId) {
-        await api.put(`/api/tasks/${editingTaskId}`, formData);
+        await api.put(
+          `/api/tasks/${editingTaskId}`,
+          isServiceProvider ? { status: formData.status } : formData
+        );
       } else {
         await api.post("/api/tasks", formData);
       }
@@ -166,6 +184,19 @@ function Tasks() {
       {editingTaskId ? (
         <p style={{ marginBottom: "16px", color: "#6b7a90" }}>
           You are editing an existing task.
+        </p>
+      ) : null}
+
+      {isResident ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You have view-only access on this page.
+        </p>
+      ) : null}
+
+      {isServiceProvider ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You can view tasks and update status only for tasks assigned to your
+          service provider account.
         </p>
       ) : null}
 
@@ -228,19 +259,22 @@ function Tasks() {
         Showing {filteredTasks.length} of {tasks.length} tasks
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          padding: "20px",
-          marginBottom: "24px",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
+      {isAdmin || (isServiceProvider && editingTaskId) ? (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            border: "1px solid #d9e2ec",
+            borderRadius: "14px",
+          }}
+        >
+          {isAdmin ? (
+            <>
         <div>
           <label
             htmlFor="title"
@@ -322,6 +356,8 @@ function Tasks() {
             <option value="urgent">Urgent</option>
           </select>
         </div>
+            </>
+          ) : null}
 
         <div>
           <label
@@ -346,24 +382,26 @@ function Tasks() {
           </select>
         </div>
 
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label
-            htmlFor="description"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows="4"
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
+          {isAdmin ? (
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label
+                htmlFor="description"
+                style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+              >
+                Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="4"
+                style={{ ...inputStyle, resize: "vertical" }}
+              />
+            </div>
+          ) : null}
 
-        <div style={{ gridColumn: "1 / -1" }}>
+          <div style={{ gridColumn: "1 / -1" }}>
           <button
             type="submit"
             disabled={submitting}
@@ -382,7 +420,9 @@ function Tasks() {
                 ? "Updating..."
                 : "Creating..."
               : editingTaskId
-              ? "Update Task"
+              ? isServiceProvider
+                ? "Update Status"
+                : "Update Task"
               : "Create Task"}
           </button>
 
@@ -404,7 +444,8 @@ function Tasks() {
             </button>
           ) : null}
         </div>
-      </form>
+        </form>
+      ) : null}
 
       <div
         style={{
@@ -424,7 +465,10 @@ function Tasks() {
                 "Deadline",
                 "Priority",
                 "Status",
-                "Actions",
+                ...(isAdmin ||
+                filteredTasks.some((task) => canServiceProviderUpdateTask(task))
+                  ? ["Actions"]
+                  : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -455,41 +499,50 @@ function Tasks() {
                   </td>
                   <td style={cellStyle}>{task.priority}</td>
                   <td style={cellStyle}>{task.status}</td>
-                  <td style={cellStyle}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(task)}
-                        style={actionButtonStyle}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(task._id)}
+                  {isAdmin || canServiceProviderUpdateTask(task) ? (
+                    <td style={cellStyle}>
+                      <div
                         style={{
-                          ...actionButtonStyle,
-                          background: "#c1121f",
-                          color: "#ffffff",
-                          borderColor: "#c1121f",
+                          display: "flex",
+                          gap: "8px",
+                          flexWrap: "wrap",
                         }}
                       >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(task)}
+                          style={actionButtonStyle}
+                        >
+                          {isServiceProvider ? "Update Status" : "Edit"}
+                        </button>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(task._id)}
+                            style={{
+                              ...actionButtonStyle,
+                              background: "#c1121f",
+                              color: "#ffffff",
+                              borderColor: "#c1121f",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan={
+                    isAdmin ||
+                    filteredTasks.some((task) => canServiceProviderUpdateTask(task))
+                      ? "7"
+                      : "6"
+                  }
                   style={{
                     padding: "18px",
                     textAlign: "center",

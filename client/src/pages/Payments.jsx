@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const initialFormData = {
@@ -12,6 +13,7 @@ const initialFormData = {
 };
 
 function Payments() {
+  const { user } = useAuth();
   const [payments, setPayments] = useState([]);
   const [providers, setProviders] = useState([]);
   const [contracts, setContracts] = useState([]);
@@ -25,6 +27,7 @@ function Payments() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isAdmin = user?.role === "admin";
 
   const resetForm = () => {
     setFormData({
@@ -173,6 +176,12 @@ function Payments() {
         </p>
       ) : null}
 
+      {!isAdmin ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You have view-only access on this page.
+        </p>
+      ) : null}
+
       <div className="filter-card">
         <div className="filter-grid">
           <div className="filter-group">
@@ -260,19 +269,20 @@ function Payments() {
         Showing {filteredPayments.length} of {payments.length} payments
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          padding: "20px",
-          marginBottom: "24px",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
+      {isAdmin ? (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            border: "1px solid #d9e2ec",
+            borderRadius: "14px",
+          }}
+        >
         <div>
           <label
             htmlFor="serviceProvider"
@@ -459,7 +469,8 @@ function Payments() {
             </button>
           ) : null}
         </div>
-      </form>
+        </form>
+      ) : null}
 
       <div
         style={{
@@ -480,7 +491,7 @@ function Payments() {
                 "Status",
                 "Reference Number",
                 "Notes",
-                "Actions",
+                ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -520,21 +531,23 @@ function Payments() {
                   </td>
                   <td style={cellStyle}>{payment.referenceNumber || "-"}</td>
                   <td style={cellStyle}>{payment.notes || "-"}</td>
-                  <td style={cellStyle}>
-                    <button
-                      type="button"
-                      onClick={() => handleEdit(payment)}
-                      style={actionButtonStyle}
-                    >
-                      Edit
-                    </button>
-                  </td>
+                  {isAdmin ? (
+                    <td style={cellStyle}>
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(payment)}
+                        style={actionButtonStyle}
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan={isAdmin ? "8" : "7"}
                   style={{
                     padding: "18px",
                     textAlign: "center",

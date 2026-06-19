@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const initialFormData = {
@@ -11,10 +12,10 @@ const initialFormData = {
 };
 
 function Complaints() {
+  const { user } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
-  const [editingComplaintId, setEditingComplaintId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -22,13 +23,15 @@ function Complaints() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isAdmin = user?.role === "admin";
+  const isResident = user?.role === "resident";
+  const isServiceProvider = user?.role === "service_provider";
 
   const resetForm = () => {
     setFormData({
       ...initialFormData,
       serviceProvider: providers[0]?._id || "",
     });
-    setEditingComplaintId("");
   };
 
   const fetchPageData = async () => {
@@ -69,62 +72,18 @@ function Complaints() {
     }));
   };
 
-  const handleEdit = (complaint) => {
-    setError("");
-    setEditingComplaintId(complaint._id);
-    setFormData({
-      title: complaint.title || "",
-      description: complaint.description || "",
-      serviceProvider: complaint.serviceProvider?._id || "",
-      category: complaint.category || "other",
-      priority: complaint.priority || "medium",
-      status: complaint.status || "open",
-    });
-  };
-
-  const handleDelete = async (complaintId) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this complaint?"
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setError("");
-
-    try {
-      await api.delete(`/api/complaints/${complaintId}`);
-
-      if (editingComplaintId === complaintId) {
-        resetForm();
-      }
-
-      await fetchPageData();
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to delete complaint.");
-    }
-  };
-
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
     setError("");
 
     try {
-      if (editingComplaintId) {
-        await api.put(`/api/complaints/${editingComplaintId}`, formData);
-      } else {
-        await api.post("/api/complaints", formData);
-      }
+      await api.post("/api/complaints", formData);
 
       resetForm();
       await fetchPageData();
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          `Failed to ${editingComplaintId ? "update" : "create"} complaint.`
-      );
+      setError(err.response?.data?.message || "Failed to create complaint.");
     } finally {
       setSubmitting(false);
     }
@@ -165,9 +124,9 @@ function Complaints() {
         <p style={{ marginBottom: "16px", color: "#c1121f" }}>{error}</p>
       ) : null}
 
-      {editingComplaintId ? (
-        <p style={{ marginBottom: "16px", color: "#6b7a90" }}>
-          You are editing an existing complaint.
+      {(isAdmin || isServiceProvider) ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You have view-only access on this page.
         </p>
       ) : null}
 
@@ -251,19 +210,20 @@ function Complaints() {
         Showing {filteredComplaints.length} of {complaints.length} complaints
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          padding: "20px",
-          marginBottom: "24px",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
+      {isResident ? (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            border: "1px solid #d9e2ec",
+            borderRadius: "14px",
+          }}
+        >
         <div>
           <label
             htmlFor="title"
@@ -407,34 +367,11 @@ function Complaints() {
               opacity: submitting ? 0.7 : 1,
             }}
           >
-            {submitting
-              ? editingComplaintId
-                ? "Updating..."
-                : "Creating..."
-              : editingComplaintId
-              ? "Update Complaint"
-              : "Create Complaint"}
+            {submitting ? "Creating..." : "Create Complaint"}
           </button>
-
-          {editingComplaintId ? (
-            <button
-              type="button"
-              onClick={resetForm}
-              style={{
-                marginLeft: "12px",
-                padding: "12px 18px",
-                border: "1px solid #d9e2ec",
-                borderRadius: "10px",
-                background: "#ffffff",
-                color: "#14213d",
-                cursor: "pointer",
-              }}
-            >
-              Cancel Edit
-            </button>
-          ) : null}
         </div>
-      </form>
+        </form>
+      ) : null}
 
       <div
         style={{
@@ -454,7 +391,6 @@ function Complaints() {
                 "Category",
                 "Priority",
                 "Status",
-                "Actions",
               ].map((heading) => (
                 <th
                   key={heading}
@@ -481,41 +417,12 @@ function Complaints() {
                   <td style={cellStyle}>{complaint.category}</td>
                   <td style={cellStyle}>{complaint.priority}</td>
                   <td style={cellStyle}>{complaint.status}</td>
-                  <td style={cellStyle}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(complaint)}
-                        style={actionButtonStyle}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(complaint._id)}
-                        style={{
-                          ...actionButtonStyle,
-                          background: "#c1121f",
-                          color: "#ffffff",
-                          borderColor: "#c1121f",
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="7"
+                  colSpan="6"
                   style={{
                     padding: "18px",
                     textAlign: "center",
@@ -545,15 +452,6 @@ const cellStyle = {
   padding: "14px",
   borderBottom: "1px solid #eef2f7",
   verticalAlign: "top",
-};
-
-const actionButtonStyle = {
-  padding: "8px 12px",
-  border: "1px solid #d9e2ec",
-  borderRadius: "8px",
-  background: "#ffffff",
-  color: "#14213d",
-  cursor: "pointer",
 };
 
 export default Complaints;

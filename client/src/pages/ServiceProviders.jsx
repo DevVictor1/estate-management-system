@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
 const initialFormData = {
@@ -12,6 +13,7 @@ const initialFormData = {
 };
 
 function ServiceProviders() {
+  const { user } = useAuth();
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
   const [editingProviderId, setEditingProviderId] = useState("");
@@ -21,6 +23,7 @@ function ServiceProviders() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isAdmin = user?.role === "admin";
 
   const resetForm = () => {
     setFormData(initialFormData);
@@ -184,6 +187,12 @@ function ServiceProviders() {
         </p>
       ) : null}
 
+      {!isAdmin ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          You have view-only access on this page.
+        </p>
+      ) : null}
+
       <div className="provider-filters">
         <div className="provider-filter-group">
           <label className="provider-filter-label" htmlFor="providerSearch">
@@ -242,19 +251,20 @@ function ServiceProviders() {
         providers
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "16px",
-          padding: "20px",
-          marginBottom: "24px",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
+      {isAdmin ? (
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            padding: "20px",
+            marginBottom: "24px",
+            background: "#ffffff",
+            border: "1px solid #d9e2ec",
+            borderRadius: "14px",
+          }}
+        >
         <div>
           <label
             htmlFor="companyName"
@@ -429,7 +439,8 @@ function ServiceProviders() {
             </button>
           ) : null}
         </div>
-      </form>
+        </form>
+      ) : null}
 
       <div
         style={{
@@ -450,7 +461,7 @@ function ServiceProviders() {
                 "Category",
                 "Address",
                 "Status",
-                "Actions",
+                ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -486,73 +497,75 @@ function ServiceProviders() {
                       {provider.verificationStatus}
                     </span>
                   </td>
-                  <td style={cellStyle}>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "8px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleEdit(provider)}
-                        style={actionButtonStyle}
-                      >
-                        Edit
-                      </button>
-                      {provider.verificationStatus !== "approved" ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleVerificationUpdate(provider._id, "approved")
-                          }
-                          style={{
-                            ...actionButtonStyle,
-                            background: "#dcfce7",
-                            color: "#166534",
-                            borderColor: "#86efac",
-                          }}
-                        >
-                          Approve
-                        </button>
-                      ) : null}
-                      {provider.verificationStatus !== "rejected" ? (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleVerificationUpdate(provider._id, "rejected")
-                          }
-                          style={{
-                            ...actionButtonStyle,
-                            background: "#fee2e2",
-                            color: "#b91c1c",
-                            borderColor: "#fca5a5",
-                          }}
-                        >
-                          Reject
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(provider._id)}
+                  {isAdmin ? (
+                    <td style={cellStyle}>
+                      <div
                         style={{
-                          ...actionButtonStyle,
-                          background: "#c1121f",
-                          color: "#ffffff",
-                          borderColor: "#c1121f",
+                          display: "flex",
+                          gap: "8px",
+                          flexWrap: "wrap",
                         }}
                       >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(provider)}
+                          style={actionButtonStyle}
+                        >
+                          Edit
+                        </button>
+                        {provider.verificationStatus !== "approved" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleVerificationUpdate(provider._id, "approved")
+                            }
+                            style={{
+                              ...actionButtonStyle,
+                              background: "#dcfce7",
+                              color: "#166534",
+                              borderColor: "#86efac",
+                            }}
+                          >
+                            Approve
+                          </button>
+                        ) : null}
+                        {provider.verificationStatus !== "rejected" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleVerificationUpdate(provider._id, "rejected")
+                            }
+                            style={{
+                              ...actionButtonStyle,
+                              background: "#fee2e2",
+                              color: "#b91c1c",
+                              borderColor: "#fca5a5",
+                            }}
+                          >
+                            Reject
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(provider._id)}
+                          style={{
+                            ...actionButtonStyle,
+                            background: "#c1121f",
+                            color: "#ffffff",
+                            borderColor: "#c1121f",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="8"
+                  colSpan={isAdmin ? "8" : "7"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
