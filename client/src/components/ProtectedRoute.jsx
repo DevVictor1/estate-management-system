@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
-function ProtectedRoute() {
+function ProtectedRoute({ allowedRoles }) {
+  const location = useLocation();
   const navigate = useNavigate();
   const { user, loading, logout } = useAuth();
   const [providerStatusLoading, setProviderStatusLoading] = useState(true);
@@ -136,6 +137,18 @@ function ProtectedRoute() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    const fallbackPath = user.role === "service_provider" ? "/tasks" : "/dashboard";
+
+    return (
+      <Navigate
+        to={fallbackPath}
+        replace
+        state={{ from: location.pathname }}
+      />
     );
   }
 

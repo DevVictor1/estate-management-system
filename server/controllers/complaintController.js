@@ -1,8 +1,22 @@
+const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
+const ServiceProvider = require("../models/ServiceProvider");
 
 const createComplaint = async (req, res) => {
   try {
-    const complaint = await Complaint.create(req.body);
+    const complaintData =
+      req.user?.role === "resident"
+        ? {
+            title: req.body.title,
+            description: req.body.description,
+            category: req.body.category,
+            priority: req.body.priority,
+            resident: req.user._id,
+            status: "open",
+          }
+        : { ...req.body };
+
+    const complaint = await Complaint.create(complaintData);
 
     res.status(201).json({
       success: true,
@@ -20,7 +34,12 @@ const createComplaint = async (req, res) => {
 
 const getComplaints = async (req, res) => {
   try {
-    const complaints = await Complaint.find()
+    const complaintQuery =
+      req.user?.role === "resident"
+        ? { resident: req.user._id }
+        : {};
+
+    const complaints = await Complaint.find(complaintQuery)
       .populate("resident", "fullName email apartmentNumber")
       .populate("serviceProvider", "companyName serviceCategory")
       .sort({ createdAt: -1 });
@@ -41,7 +60,12 @@ const getComplaints = async (req, res) => {
 
 const getComplaintById = async (req, res) => {
   try {
-    const complaint = await Complaint.findById(req.params.id)
+    const complaintQuery =
+      req.user?.role === "resident"
+        ? { _id: req.params.id, resident: req.user._id }
+        : { _id: req.params.id };
+
+    const complaint = await Complaint.findOne(complaintQuery)
       .populate("resident", "fullName email apartmentNumber")
       .populate("serviceProvider", "companyName serviceCategory");
 
@@ -67,10 +91,51 @@ const getComplaintById = async (req, res) => {
 
 const updateComplaint = async (req, res) => {
   try {
-    const updateData = { ...req.body };
+    const allowedFields = [
+      "title",
+      "description",
+      "serviceProvider",
+      "category",
+      "priority",
+      "status",
+      "resolutionNote",
+    ];
+    const updateData = {};
+
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    if (updateData.serviceProvider !== undefined && updateData.serviceProvider !== null && updateData.serviceProvider !== "") {
+      if (!mongoose.Types.ObjectId.isValid(updateData.serviceProvider)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid service provider ID.",
+        });
+      }
+
+      const serviceProvider = await ServiceProvider.findById(
+        updateData.serviceProvider
+      ).select("_id");
+
+      if (!serviceProvider) {
+        return res.status(404).json({
+          success: false,
+          message: "Service provider not found.",
+        });
+      }
+    }
+
+    if (updateData.serviceProvider === "") {
+      updateData.serviceProvider = null;
+    }
 
     if (updateData.status === "resolved") {
       updateData.resolvedAt = new Date();
+    } else if (updateData.status && updateData.status !== "resolved") {
+      updateData.resolvedAt = null;
     }
 
     const complaint = await Complaint.findByIdAndUpdate(

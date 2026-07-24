@@ -24,6 +24,12 @@ const taskSchema = new mongoose.Schema(
         ref: "User",
     },
 
+    complaint: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Complaint",
+        default: null,
+    },
+
     deadline: {
         type: Date,
         required: true,

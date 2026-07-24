@@ -21,7 +21,7 @@ const createContract = async (req, res) => {
 const getContracts = async (req, res) => {
   try {
     const contracts = await Contract.find()
-      .populate("serviceProvider", "companyName serviceCategory phone")
+      .populate("serviceProvider", "companyName serviceCategory phone email")
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -42,7 +42,7 @@ const getContractById = async (req, res) => {
   try {
     const contract = await Contract.findById(req.params.id).populate(
       "serviceProvider",
-      "companyName serviceCategory phone"
+      "companyName serviceCategory phone email"
     );
 
     if (!contract) {

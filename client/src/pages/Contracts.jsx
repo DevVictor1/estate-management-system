@@ -13,6 +13,49 @@ const initialFormData = {
   notes: "",
 };
 
+const currencyFormatter = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  maximumFractionDigits: 2,
+});
+
+const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const formatContractDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  return dateFormatter.format(new Date(value));
+};
+
+const formatContractStatusLabel = (status) => {
+  if (!status) {
+    return "-";
+  }
+
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
+
+const getContractStatusTone = (status) => {
+  if (status === "active") {
+    return "success";
+  }
+
+  if (status === "terminated") {
+    return "danger";
+  }
+
+  return "warning";
+};
+
 function Contracts() {
   const { user } = useAuth();
   const [contracts, setContracts] = useState([]);
@@ -27,6 +70,7 @@ function Contracts() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isAdmin = user?.role === "admin";
+  const isServiceProvider = user?.role === "service_provider";
 
   const resetForm = () => {
     setFormData({
@@ -172,8 +216,254 @@ function Contracts() {
     return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
   });
 
+  const normalizedUserEmail = user?.email?.trim().toLowerCase();
+
+  const providerContracts = contracts.filter(
+    (contract) =>
+      contract.serviceProvider?.email?.trim().toLowerCase() ===
+      normalizedUserEmail
+  );
+
+  const sortedProviderContracts = [...providerContracts]
+    .sort((firstContract, secondContract) => {
+      const firstIsActive = firstContract.status === "active" ? 1 : 0;
+      const secondIsActive = secondContract.status === "active" ? 1 : 0;
+
+      if (firstIsActive !== secondIsActive) {
+        return secondIsActive - firstIsActive;
+      }
+
+      const firstStartDate = firstContract.startDate
+        ? new Date(firstContract.startDate).getTime()
+        : 0;
+      const secondStartDate = secondContract.startDate
+        ? new Date(secondContract.startDate).getTime()
+        : 0;
+
+      return secondStartDate - firstStartDate;
+    });
+
+  const currentContract = sortedProviderContracts.at(0);
+  const previousContracts = currentContract
+    ? sortedProviderContracts.filter(
+        (contract) => contract._id !== currentContract._id
+      )
+    : [];
+
   if (loading) {
     return <p>Loading contracts...</p>;
+  }
+
+  if (isServiceProvider) {
+    return (
+      <section className="dashboard-page provider-contract-page">
+        <div className="dashboard-hero">
+          <div>
+            <p className="dashboard-eyebrow">Provider Agreement</p>
+            <h1>My Contract</h1>
+            <p className="dashboard-subtitle">
+              Review the contract currently associated with your service
+              provider account.
+            </p>
+          </div>
+        </div>
+
+        {error ? <p style={{ color: "#c1121f" }}>{error}</p> : null}
+
+        {!currentContract ? (
+          <section className="dashboard-section-card provider-contract-empty">
+            <div className="dashboard-section-header">
+              <div>
+                <h2>No Contract Found</h2>
+                <p>
+                  You have not yet been assigned a contract. Please contact the
+                  Estate Manager if you believe this is an error.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="dashboard-section-card provider-contract-banner">
+              <p>
+                This contract is managed by the Estate Manager and is provided
+                for your reference only.
+              </p>
+            </section>
+
+            <section className="dashboard-section-card">
+              <div className="dashboard-section-header">
+                <div>
+                  <h2>Current Contract</h2>
+                  <p>
+                    Your current contract is selected by preferring active
+                    agreements, then falling back to the newest contract by
+                    start date.
+                  </p>
+                </div>
+              </div>
+
+              <article className="provider-contract-card">
+                <div className="provider-contract-card-header">
+                  <div>
+                    <p className="provider-contract-card-kicker">
+                      Current Contract
+                    </p>
+                    <h3 className="provider-contract-title">
+                      {currentContract.contractTitle}
+                    </h3>
+                  </div>
+                  <span
+                    className={`provider-contract-status provider-contract-status-${getContractStatusTone(
+                      currentContract.status
+                    )}`}
+                  >
+                    {formatContractStatusLabel(currentContract.status)}
+                  </span>
+                </div>
+
+                <div className="provider-contract-grid">
+                  <div className="provider-contract-field">
+                    <span className="provider-contract-label">
+                      Service Provider / Company Name
+                    </span>
+                    <strong className="provider-contract-value">
+                      {currentContract.serviceProvider?.companyName || "-"}
+                    </strong>
+                  </div>
+
+                  <div className="provider-contract-field">
+                    <span className="provider-contract-label">
+                      Service Category
+                    </span>
+                    <strong className="provider-contract-value">
+                      {currentContract.serviceProvider?.serviceCategory || "-"}
+                    </strong>
+                  </div>
+
+                  <div className="provider-contract-field provider-contract-field-full">
+                    <span className="provider-contract-label">
+                      Contract Period
+                    </span>
+                    <div className="provider-contract-period">
+                      <div className="provider-contract-period-item">
+                        <span className="provider-contract-period-label">
+                          Start Date
+                        </span>
+                        <strong className="provider-contract-value">
+                          {formatContractDate(currentContract.startDate)}
+                        </strong>
+                      </div>
+                      <div className="provider-contract-period-item">
+                        <span className="provider-contract-period-label">
+                          End Date
+                        </span>
+                        <strong className="provider-contract-value">
+                          {formatContractDate(currentContract.endDate)}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="provider-contract-field">
+                    <span className="provider-contract-label">
+                      Payment Terms
+                    </span>
+                    <strong className="provider-contract-value">
+                      {currentContract.paymentTerms || "-"}
+                    </strong>
+                  </div>
+
+                  <div className="provider-contract-field">
+                    <span className="provider-contract-label">
+                      Contract Value
+                    </span>
+                    <strong className="provider-contract-value provider-contract-value-currency">
+                      {currencyFormatter.format(currentContract.contractValue || 0)}
+                    </strong>
+                  </div>
+
+                  <div className="provider-contract-field provider-contract-field-full">
+                    <span className="provider-contract-label">
+                      Notes / Scope of Work
+                    </span>
+                    <p className="provider-contract-notes">
+                      {currentContract.notes ||
+                        "No additional notes or scope of work details were provided."}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            </section>
+
+            <section className="dashboard-section-card">
+              <div className="dashboard-section-header">
+                <div>
+                  <h2>Previous Contracts</h2>
+                  <p>
+                    Earlier contract records linked to your provider account are
+                    shown below.
+                  </p>
+                </div>
+              </div>
+
+              {previousContracts.length > 0 ? (
+                <div className="provider-contract-history-list">
+                  {previousContracts.map((contract) => (
+                    <article
+                      key={contract._id}
+                      className="provider-contract-history-card"
+                    >
+                      <div className="provider-contract-history-header">
+                        <div>
+                          <h3 className="provider-contract-history-title">
+                            {contract.contractTitle}
+                          </h3>
+                          <p className="provider-contract-history-period">
+                            {formatContractDate(contract.startDate)} to{" "}
+                            {formatContractDate(contract.endDate)}
+                          </p>
+                        </div>
+                        <span
+                          className={`provider-contract-status provider-contract-status-${getContractStatusTone(
+                            contract.status
+                          )}`}
+                        >
+                          {formatContractStatusLabel(contract.status)}
+                        </span>
+                      </div>
+
+                      <div className="provider-contract-history-meta">
+                        <div className="provider-contract-history-item">
+                          <span className="provider-contract-label">
+                            Contract Value
+                          </span>
+                          <strong className="provider-contract-value">
+                            {currencyFormatter.format(contract.contractValue || 0)}
+                          </strong>
+                        </div>
+                        <div className="provider-contract-history-item">
+                          <span className="provider-contract-label">
+                            Status
+                          </span>
+                          <strong className="provider-contract-value">
+                            {formatContractStatusLabel(contract.status)}
+                          </strong>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="provider-contract-empty-message">
+                  No previous contracts.
+                </p>
+              )}
+            </section>
+          </>
+        )}
+      </section>
+    );
   }
 
   return (

@@ -22,7 +22,14 @@ const getPayments = async (req, res) => {
   try {
     const payments = await Payment.find()
       .populate("serviceProvider", "companyName serviceCategory phone")
-      .populate("contract", "contractTitle contractValue status")
+      .populate({
+        path: "contract",
+        select: "contractTitle contractValue status serviceProvider",
+        populate: {
+          path: "serviceProvider",
+          select: "companyName serviceCategory email",
+        },
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -43,7 +50,14 @@ const getPaymentById = async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id)
       .populate("serviceProvider", "companyName serviceCategory phone")
-      .populate("contract", "contractTitle contractValue status");
+      .populate({
+        path: "contract",
+        select: "contractTitle contractValue status serviceProvider",
+        populate: {
+          path: "serviceProvider",
+          select: "companyName serviceCategory email",
+        },
+      });
 
     if (!payment) {
       return res.status(404).json({

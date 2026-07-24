@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { FaArrowLeft, FaClipboardCheck } from "react-icons/fa6";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -11,21 +13,39 @@ const initialFormData = {
   status: "pending",
 };
 
+const providerAllowedStatuses = ["pending", "in_progress", "completed"];
+
 function Tasks() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [providers, setProviders] = useState([]);
   const [formData, setFormData] = useState(initialFormData);
   const [editingTaskId, setEditingTaskId] = useState("");
+  const [complaintContext, setComplaintContext] = useState(null);
+  const [loadingComplaint, setLoadingComplaint] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState(null);
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
+
+  const complaintPrefillRequestId =
+    isAdmin &&
+    !editingTaskId &&
+    location.state?.fromComplaint === true &&
+    location.state?.complaintId
+      ? location.state.complaintId
+      : "";
+
+  const isComplaintPrefillMode =
+    isAdmin && !editingTaskId && Boolean(complaintContext?._id);
 
   const canServiceProviderUpdateTask = (task) =>
     isServiceProvider &&
@@ -33,12 +53,31 @@ function Tasks() {
     user?.email &&
     task.serviceProvider.email.toLowerCase() === user.email.toLowerCase();
 
+  const serviceProviderTasks = tasks.filter((task) =>
+    canServiceProviderUpdateTask(task)
+  );
+
+  const visibleTasks = isServiceProvider ? serviceProviderTasks : tasks;
+
   const resetForm = () => {
     setFormData({
       ...initialFormData,
       serviceProvider: providers[0]?._id || "",
     });
     setEditingTaskId("");
+  };
+
+  const clearComplaintPrefillState = ({ resetTaskForm = true } = {}) => {
+    setComplaintContext(null);
+    setLoadingComplaint(false);
+
+    if (resetTaskForm) {
+      resetForm();
+    }
+
+    if (location.state?.fromComplaint) {
+      navigate("/tasks", { replace: true });
+    }
   };
 
   const fetchPageData = async () => {
@@ -71,6 +110,71 @@ function Tasks() {
     fetchPageData();
   }, []);
 
+  useEffect(() => {
+    if (!complaintPrefillRequestId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadComplaint = async () => {
+      setLoadingComplaint(true);
+      setError("");
+      setFeedback(null);
+
+      try {
+        const response = await api.get(
+          `/api/complaints/${complaintPrefillRequestId}`
+        );
+        const complaint = response.data.data;
+
+        if (!isMounted) {
+          return;
+        }
+
+        setEditingTaskId("");
+        setComplaintContext(complaint);
+        setFormData({
+          ...initialFormData,
+          title: complaint.title || "",
+          description: complaint.description || "",
+          serviceProvider: "",
+          deadline: "",
+          priority: complaint.priority || "medium",
+          status: "pending",
+        });
+      } catch (err) {
+        if (!isMounted) {
+          return;
+        }
+
+        const statusCode = err.response?.status;
+        const message =
+          statusCode === 404
+            ? "The selected complaint could not be found."
+            : statusCode === 400
+            ? "The complaint reference is invalid."
+            : statusCode === 401 || statusCode === 403
+            ? "You are not authorized to load this complaint."
+            : "We couldn't load the complaint details for task creation. Please try again.";
+
+        setComplaintContext(null);
+        setError(message);
+        navigate("/tasks", { replace: true });
+      } finally {
+        if (isMounted) {
+          setLoadingComplaint(false);
+        }
+      }
+    };
+
+    loadComplaint();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [complaintPrefillRequestId, navigate]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((currentData) => ({
@@ -85,6 +189,12 @@ function Tasks() {
     }
 
     setError("");
+    setFeedback(null);
+
+    if (complaintContext || location.state?.fromComplaint) {
+      clearComplaintPrefillState({ resetTaskForm: false });
+    }
+
     setEditingTaskId(task._id);
     setFormData({
       title: task.title || "",
@@ -108,6 +218,7 @@ function Tasks() {
     }
 
     setError("");
+    setFeedback(null);
 
     try {
       await api.delete(`/api/tasks/${taskId}`);
@@ -117,6 +228,10 @@ function Tasks() {
       }
 
       await fetchPageData();
+      setFeedback({
+        type: "success",
+        text: "Task deleted successfully.",
+      });
     } catch (err) {
       setError(err.response?.data?.message || "Failed to delete task.");
     }
@@ -126,36 +241,113 @@ function Tasks() {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    setFeedback(null);
 
     try {
       if (editingTaskId) {
-        await api.put(
-          `/api/tasks/${editingTaskId}`,
-          isServiceProvider ? { status: formData.status } : formData
-        );
-      } else {
-        await api.post("/api/tasks", formData);
-      }
+        if (
+          isServiceProvider &&
+          !providerAllowedStatuses.includes(formData.status)
+        ) {
+          setError(
+            "You can only update your task status to pending, in progress, or completed."
+          );
+          return;
+        }
 
-      resetForm();
-      await fetchPageData();
+        if (isServiceProvider) {
+          await api.patch(`/api/tasks/${editingTaskId}/status`, {
+            status: formData.status,
+          });
+        } else {
+          await api.put(`/api/tasks/${editingTaskId}`, formData);
+        }
+
+        resetForm();
+        await fetchPageData();
+        setFeedback({
+          type: "success",
+          text: "Task updated successfully.",
+        });
+      } else {
+        const payload = isComplaintPrefillMode
+          ? {
+              ...formData,
+              complaint: complaintContext._id,
+            }
+          : { ...formData };
+
+        await api.post("/api/tasks", payload);
+        await fetchPageData();
+
+        if (isComplaintPrefillMode) {
+          if (formData.serviceProvider) {
+            try {
+              await api.put(`/api/complaints/${complaintContext._id}`, {
+                status: "assigned",
+                serviceProvider: formData.serviceProvider,
+              });
+
+              setFeedback({
+                type: "success",
+                text: "Task created successfully and the complaint assignment was updated.",
+              });
+            } catch (statusUpdateError) {
+              setFeedback({
+                type: "warning",
+                text: "The task was created, but the complaint assignment details could not be updated.",
+              });
+            }
+          } else {
+            setFeedback({
+              type: "success",
+              text: "Task created successfully.",
+            });
+          }
+
+          clearComplaintPrefillState();
+        } else {
+          resetForm();
+          setFeedback({
+            type: "success",
+            text: "Task created successfully.",
+          });
+        }
+      }
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          `Failed to ${editingTaskId ? "update" : "create"} task.`
-      );
+      if (err.response?.status === 409) {
+        setError("A task has already been created for this complaint.");
+      } else {
+        setError(
+          err.response?.data?.message ||
+            `Failed to ${editingTaskId ? "update" : "create"} task.`
+        );
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const filteredTasks = tasks.filter((task) => {
+  const handleCancelEdit = () => {
+    setError("");
+    setFeedback(null);
+    resetForm();
+  };
+
+  const handleCancelComplaintPrefill = () => {
+    setError("");
+    setFeedback(null);
+    clearComplaintPrefillState();
+  };
+
+  const filteredTasks = visibleTasks.filter((task) => {
     const searchValue = searchTerm.trim().toLowerCase();
     const matchesSearch =
       !searchValue ||
       task.title?.toLowerCase().includes(searchValue) ||
       task.description?.toLowerCase().includes(searchValue) ||
-      task.serviceProvider?.companyName?.toLowerCase().includes(searchValue);
+      (!isServiceProvider &&
+        task.serviceProvider?.companyName?.toLowerCase().includes(searchValue));
 
     const matchesPriority =
       !priorityFilter || task.priority === priorityFilter;
@@ -164,6 +356,30 @@ function Tasks() {
     return matchesSearch && matchesPriority && matchesStatus;
   });
 
+  const serviceProviderSummary = {
+    total: serviceProviderTasks.length,
+    pending: serviceProviderTasks.filter((task) => task.status === "pending")
+      .length,
+    inProgress: serviceProviderTasks.filter(
+      (task) => task.status === "in_progress"
+    ).length,
+    completed: serviceProviderTasks.filter(
+      (task) => task.status === "completed"
+    ).length,
+  };
+
+  const showActionsColumn =
+    isAdmin ||
+    (isServiceProvider &&
+      filteredTasks.some((task) => canServiceProviderUpdateTask(task)));
+
+  const residentName =
+    complaintContext?.resident?.fullName?.trim() || "Not provided";
+  const residentEmail =
+    complaintContext?.resident?.email?.trim() || "Not provided";
+  const apartmentNumber =
+    complaintContext?.resident?.apartmentNumber?.trim() || "Not provided";
+
   if (loading) {
     return <p>Loading tasks...</p>;
   }
@@ -171,11 +387,27 @@ function Tasks() {
   return (
     <section>
       <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ marginBottom: "8px" }}>Tasks</h1>
+        <h1 style={{ marginBottom: "8px" }}>
+          {isServiceProvider ? "My Assigned Tasks" : "Tasks"}
+        </h1>
         <p style={{ color: "#6b7a90" }}>
-          Create tasks for service providers and track their progress.
+          {isServiceProvider
+            ? "Review the work assigned to your provider account and keep task progress up to date."
+            : "Create tasks for service providers and track their progress."}
         </p>
       </div>
+
+      {feedback ? (
+        <div
+          className={`task-feedback ${
+            feedback.type === "warning"
+              ? "task-feedback-warning"
+              : "task-feedback-success"
+          }`}
+        >
+          <p>{feedback.text}</p>
+        </div>
+      ) : null}
 
       {error ? (
         <p style={{ marginBottom: "16px", color: "#c1121f" }}>{error}</p>
@@ -200,6 +432,127 @@ function Tasks() {
         </p>
       ) : null}
 
+      {isAdmin && loadingComplaint ? (
+        <div className="complaint-task-banner">
+          <p className="complaint-task-banner-label">
+            Creating Task from Complaint
+          </p>
+          <h2>Loading complaint details...</h2>
+          <p>
+            We are loading the complaint information you selected so the task
+            form can be prepared safely.
+          </p>
+        </div>
+      ) : null}
+
+      {isComplaintPrefillMode ? (
+        <div className="complaint-task-banner">
+          <p className="complaint-task-banner-label">
+            Creating Task from Complaint
+          </p>
+          <h2>
+            Review the complaint details, select a service provider, and set
+            the deadline.
+          </h2>
+
+          <div className="complaint-task-actions">
+            <button
+              type="button"
+              onClick={() => navigate("/complaints")}
+              className="complaint-task-button complaint-task-button-secondary"
+            >
+              <FaArrowLeft />
+              <span>Back to Complaints</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCancelComplaintPrefill}
+              className="complaint-task-button complaint-task-button-secondary"
+            >
+              Cancel Complaint Prefill
+            </button>
+          </div>
+
+          <div className="complaint-task-context">
+            <div className="complaint-task-context-grid">
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">
+                  Complaint Title
+                </span>
+                <strong>{complaintContext.title || "Not provided"}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">Category</span>
+                <strong>{complaintContext.category || "Not provided"}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">Priority</span>
+                <strong>{complaintContext.priority || "Not provided"}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">
+                  Complaint Status
+                </span>
+                <strong>{complaintContext.status || "Not provided"}</strong>
+              </div>
+              <div className="complaint-task-context-item complaint-task-context-item-full">
+                <span className="complaint-task-context-label">
+                  Complaint Description
+                </span>
+                <strong>{complaintContext.description || "Not provided"}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">
+                  Resident Name
+                </span>
+                <strong>{residentName}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">
+                  Resident Email
+                </span>
+                <strong>{residentEmail}</strong>
+              </div>
+              <div className="complaint-task-context-item">
+                <span className="complaint-task-context-label">
+                  Apartment Number
+                </span>
+                <strong>{apartmentNumber}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isServiceProvider ? (
+        <div className="task-summary-grid">
+          <article className="task-summary-card task-summary-total">
+            <span className="task-summary-label">Total Assigned</span>
+            <strong className="task-summary-value">
+              {serviceProviderSummary.total}
+            </strong>
+          </article>
+          <article className="task-summary-card task-summary-pending">
+            <span className="task-summary-label">Pending</span>
+            <strong className="task-summary-value">
+              {serviceProviderSummary.pending}
+            </strong>
+          </article>
+          <article className="task-summary-card task-summary-progress">
+            <span className="task-summary-label">In Progress</span>
+            <strong className="task-summary-value">
+              {serviceProviderSummary.inProgress}
+            </strong>
+          </article>
+          <article className="task-summary-card task-summary-completed">
+            <span className="task-summary-label">Completed</span>
+            <strong className="task-summary-value">
+              {serviceProviderSummary.completed}
+            </strong>
+          </article>
+        </div>
+      ) : null}
+
       <div className="filter-card">
         <div className="filter-grid">
           <div className="filter-group">
@@ -211,7 +564,11 @@ function Tasks() {
               type="text"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search by title, description, or provider"
+              placeholder={
+                isServiceProvider
+                  ? "Search by title or description"
+                  : "Search by title, description, or provider"
+              }
               className="filter-control"
             />
           </div>
@@ -248,15 +605,19 @@ function Tasks() {
               <option value="pending">Pending</option>
               <option value="in_progress">In Progress</option>
               <option value="completed">Completed</option>
-              <option value="overdue">Overdue</option>
-              <option value="cancelled">Cancelled</option>
+              {!isServiceProvider ? (
+                <>
+                  <option value="overdue">Overdue</option>
+                  <option value="cancelled">Cancelled</option>
+                </>
+              ) : null}
             </select>
           </div>
         </div>
       </div>
 
       <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredTasks.length} of {tasks.length} tasks
+        Showing {filteredTasks.length} of {visibleTasks.length} tasks
       </p>
 
       {isAdmin || (isServiceProvider && editingTaskId) ? (
@@ -275,118 +636,146 @@ function Tasks() {
         >
           {isAdmin ? (
             <>
-        <div>
-          <label
-            htmlFor="title"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Title
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            value={formData.title}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+              <div>
+                <label
+                  htmlFor="title"
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Title
+                </label>
+                <input
+                  id="title"
+                  name="title"
+                  type="text"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  style={inputStyle}
+                />
+              </div>
 
-        <div>
-          <label
-            htmlFor="serviceProvider"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Service Provider
-          </label>
-          <select
-            id="serviceProvider"
-            name="serviceProvider"
-            value={formData.serviceProvider}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="">Select a provider</option>
-            {providers.map((provider) => (
-              <option key={provider._id} value={provider._id}>
-                {provider.companyName}
-              </option>
-            ))}
-          </select>
-        </div>
+              <div>
+                <label
+                  htmlFor="serviceProvider"
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Service Provider
+                </label>
+                <select
+                  id="serviceProvider"
+                  name="serviceProvider"
+                  value={formData.serviceProvider}
+                  onChange={handleChange}
+                  required
+                  style={inputStyle}
+                >
+                  <option value="">Select a provider</option>
+                  {providers.map((provider) => (
+                    <option key={provider._id} value={provider._id}>
+                      {provider.companyName}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        <div>
-          <label
-            htmlFor="deadline"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Deadline
-          </label>
-          <input
-            id="deadline"
-            name="deadline"
-            type="date"
-            value={formData.deadline}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+              <div>
+                <label
+                  htmlFor="deadline"
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Deadline
+                </label>
+                <input
+                  id="deadline"
+                  name="deadline"
+                  type="date"
+                  value={formData.deadline}
+                  onChange={handleChange}
+                  required
+                  style={inputStyle}
+                />
+              </div>
 
-        <div>
-          <label
-            htmlFor="priority"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Priority
-          </label>
-          <select
-            id="priority"
-            name="priority"
-            value={formData.priority}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
+              <div>
+                <label
+                  htmlFor="priority"
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Priority
+                </label>
+                <select
+                  id="priority"
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                  required
+                  style={inputStyle}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
             </>
           ) : null}
 
-        <div>
-          <label
-            htmlFor="status"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="pending">Pending</option>
-            <option value="in_progress">In Progress</option>
-            <option value="completed">Completed</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="status"
+              style={{
+                display: "block",
+                marginBottom: "8px",
+                fontWeight: "600",
+              }}
+            >
+              Status
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            >
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              {isAdmin ? (
+                <>
+                  <option value="overdue">Overdue</option>
+                  <option value="cancelled">Cancelled</option>
+                </>
+              ) : null}
+            </select>
+          </div>
 
           {isAdmin ? (
             <div style={{ gridColumn: "1 / -1" }}>
               <label
                 htmlFor="description"
-                style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+                style={{
+                  display: "block",
+                  marginBottom: "8px",
+                  fontWeight: "600",
+                }}
               >
                 Description
               </label>
@@ -402,48 +791,48 @@ function Tasks() {
           ) : null}
 
           <div style={{ gridColumn: "1 / -1" }}>
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              padding: "12px 18px",
-              border: "none",
-              borderRadius: "10px",
-              background: "#0b1f3a",
-              color: "#ffffff",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.7 : 1,
-            }}
-          >
-            {submitting
-              ? editingTaskId
-                ? "Updating..."
-                : "Creating..."
-              : editingTaskId
-              ? isServiceProvider
-                ? "Update Status"
-                : "Update Task"
-              : "Create Task"}
-          </button>
-
-          {editingTaskId ? (
             <button
-              type="button"
-              onClick={resetForm}
+              type="submit"
+              disabled={submitting || loadingComplaint}
               style={{
-                marginLeft: "12px",
                 padding: "12px 18px",
-                border: "1px solid #d9e2ec",
+                border: "none",
                 borderRadius: "10px",
-                background: "#ffffff",
-                color: "#14213d",
-                cursor: "pointer",
+                background: "#0b1f3a",
+                color: "#ffffff",
+                cursor: submitting || loadingComplaint ? "not-allowed" : "pointer",
+                opacity: submitting || loadingComplaint ? 0.7 : 1,
               }}
             >
-              Cancel Edit
+              {submitting
+                ? editingTaskId
+                  ? "Updating..."
+                  : "Creating..."
+                : editingTaskId
+                ? isServiceProvider
+                  ? "Update Status"
+                  : "Update Task"
+                : "Create Task"}
             </button>
-          ) : null}
-        </div>
+
+            {editingTaskId ? (
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                style={{
+                  marginLeft: "12px",
+                  padding: "12px 18px",
+                  border: "1px solid #d9e2ec",
+                  borderRadius: "10px",
+                  background: "#ffffff",
+                  color: "#14213d",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel Edit
+              </button>
+            ) : null}
+          </div>
         </form>
       ) : null}
 
@@ -461,14 +850,11 @@ function Tasks() {
               {[
                 "Title",
                 "Description",
-                "Service Provider",
                 "Deadline",
                 "Priority",
                 "Status",
-                ...(isAdmin ||
-                filteredTasks.some((task) => canServiceProviderUpdateTask(task))
-                  ? ["Actions"]
-                  : []),
+                ...(!isServiceProvider ? ["Service Provider"] : []),
+                ...(showActionsColumn ? ["Actions"] : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -490,16 +876,18 @@ function Tasks() {
                   <td style={cellStyle}>{task.title}</td>
                   <td style={cellStyle}>{task.description || "-"}</td>
                   <td style={cellStyle}>
-                    {task.serviceProvider?.companyName || "-"}
-                  </td>
-                  <td style={cellStyle}>
                     {task.deadline
                       ? new Date(task.deadline).toLocaleDateString()
                       : "-"}
                   </td>
                   <td style={cellStyle}>{task.priority}</td>
                   <td style={cellStyle}>{task.status}</td>
-                  {isAdmin || canServiceProviderUpdateTask(task) ? (
+                  {!isServiceProvider ? (
+                    <td style={cellStyle}>
+                      {task.serviceProvider?.companyName || "-"}
+                    </td>
+                  ) : null}
+                  {showActionsColumn ? (
                     <td style={cellStyle}>
                       <div
                         style={{
@@ -508,13 +896,15 @@ function Tasks() {
                           flexWrap: "wrap",
                         }}
                       >
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(task)}
-                          style={actionButtonStyle}
-                        >
-                          {isServiceProvider ? "Update Status" : "Edit"}
-                        </button>
+                        {isAdmin || canServiceProviderUpdateTask(task) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(task)}
+                            style={actionButtonStyle}
+                          >
+                            {isServiceProvider ? "Update Status" : "Edit"}
+                          </button>
+                        ) : null}
                         {isAdmin ? (
                           <button
                             type="button"
@@ -537,19 +927,16 @@ function Tasks() {
             ) : (
               <tr>
                 <td
-                  colSpan={
-                    isAdmin ||
-                    filteredTasks.some((task) => canServiceProviderUpdateTask(task))
-                      ? "7"
-                      : "6"
-                  }
+                  colSpan={isAdmin ? "7" : showActionsColumn ? "6" : "5"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
                     color: "#6b7a90",
                   }}
                 >
-                  No tasks match the current filters.
+                  {isServiceProvider
+                    ? "No assigned tasks match the current filters."
+                    : "No tasks match the current filters."}
                 </td>
               </tr>
             )}

@@ -8,6 +8,7 @@ import {
   FaUsersGear,
 } from "react-icons/fa6";
 import Navbar from "./Navbar";
+import { useAuth } from "../context/AuthContext";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: FaGaugeHigh },
@@ -27,6 +28,41 @@ const navItems = [
 ];
 
 function Layout() {
+  const { user } = useAuth();
+  const visibleNavItems = navItems
+    .filter((item) => {
+      if (user?.role === "service_provider" && item.to === "/complaints") {
+        return false;
+      }
+
+      if (user?.role === "resident" && item.to === "/contracts") {
+        return false;
+      }
+
+      if (user?.role === "resident" && item.to === "/payments") {
+        return false;
+      }
+
+      return true;
+    })
+    .map((item) => {
+      if (user?.role === "service_provider" && item.to === "/contracts") {
+        return {
+          ...item,
+          label: "My Contract",
+        };
+      }
+
+      if (user?.role === "service_provider" && item.to === "/payments") {
+        return {
+          ...item,
+          label: "My Payments",
+        };
+      }
+
+      return item;
+    });
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -40,7 +76,7 @@ function Layout() {
           </div>
 
           <nav className="sidebar-nav" aria-label="Sidebar navigation">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const Icon = item.icon;
 
               return (

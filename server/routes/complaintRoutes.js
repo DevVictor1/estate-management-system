@@ -11,9 +11,9 @@ const {
 
 const router = express.Router();
 
-router.post("/", protect, createComplaint);
-router.get("/", protect, getComplaints);
-router.get("/:id", protect, getComplaintById);
+router.post("/", protect, authorizeRoles("admin", "resident"), createComplaint);
+router.get("/", protect, authorizeRoles("admin", "resident"), getComplaints);
+router.get("/:id", protect, authorizeRoles("admin", "resident"), getComplaintById);
 router.put("/:id", protect, authorizeRoles("admin"), updateComplaint);
 router.delete("/:id", protect, authorizeRoles("admin"), deleteComplaint);
 

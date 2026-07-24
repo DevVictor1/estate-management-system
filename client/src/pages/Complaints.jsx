@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { FaClipboardCheck } from "react-icons/fa6";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -12,6 +14,7 @@ const initialFormData = {
 };
 
 function Complaints() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [complaints, setComplaints] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -28,10 +31,7 @@ function Complaints() {
   const isServiceProvider = user?.role === "service_provider";
 
   const resetForm = () => {
-    setFormData({
-      ...initialFormData,
-      serviceProvider: providers[0]?._id || "",
-    });
+    setFormData(initialFormData);
   };
 
   const fetchPageData = async () => {
@@ -48,11 +48,6 @@ function Complaints() {
 
       setComplaints(fetchedComplaints);
       setProviders(fetchedProviders);
-      setFormData((currentFormData) => ({
-        ...currentFormData,
-        serviceProvider:
-          currentFormData.serviceProvider || fetchedProviders[0]?._id || "",
-      }));
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load complaints.");
     } finally {
@@ -78,7 +73,16 @@ function Complaints() {
     setError("");
 
     try {
-      await api.post("/api/complaints", formData);
+      const payload = isResident
+        ? {
+            title: formData.title,
+            category: formData.category,
+            description: formData.description,
+            priority: formData.priority,
+          }
+        : { ...formData };
+
+      await api.post("/api/complaints", payload);
 
       resetForm();
       await fetchPageData();
@@ -87,6 +91,15 @@ function Complaints() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleCreateTask = (complaintId) => {
+    navigate("/tasks", {
+      state: {
+        fromComplaint: true,
+        complaintId,
+      },
+    });
   };
 
   const filteredComplaints = complaints.filter((complaint) => {
@@ -124,7 +137,14 @@ function Complaints() {
         <p style={{ marginBottom: "16px", color: "#c1121f" }}>{error}</p>
       ) : null}
 
-      {(isAdmin || isServiceProvider) ? (
+      {isAdmin ? (
+        <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
+          Review complaints and create linked tasks for service providers when
+          action is required.
+        </p>
+      ) : null}
+
+      {isServiceProvider ? (
         <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
           You have view-only access on this page.
         </p>
@@ -224,152 +244,113 @@ function Complaints() {
             borderRadius: "14px",
           }}
         >
-        <div>
-          <label
-            htmlFor="title"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Title
-          </label>
-          <input
-            id="title"
-            name="title"
-            type="text"
-            value={formData.title}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <p style={{ color: "#6b7a90" }}>
+              Submit the issue and the Estate Manager will review it and assign
+              the appropriate service provider.
+            </p>
+          </div>
 
-        <div>
-          <label
-            htmlFor="serviceProvider"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Service Provider
-          </label>
-          <select
-            id="serviceProvider"
-            name="serviceProvider"
-            value={formData.serviceProvider}
-            onChange={handleChange}
-            style={inputStyle}
-          >
-            <option value="">Select a provider</option>
-            {providers.map((provider) => (
-              <option key={provider._id} value={provider._id}>
-                {provider.companyName}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="title"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Title
+            </label>
+            <input
+              id="title"
+              name="title"
+              type="text"
+              value={formData.title}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="category"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Category
-          </label>
-          <select
-            id="category"
-            name="category"
-            value={formData.category}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="security">Security</option>
-            <option value="cleaning">Cleaning</option>
-            <option value="waste_management">Waste Management</option>
-            <option value="landscaping">Landscaping</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="payment">Payment</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="category"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Category
+            </label>
+            <select
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            >
+              <option value="security">Security</option>
+              <option value="cleaning">Cleaning</option>
+              <option value="waste_management">Waste Management</option>
+              <option value="landscaping">Landscaping</option>
+              <option value="maintenance">Maintenance</option>
+              <option value="payment">Payment</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
 
-        <div>
-          <label
-            htmlFor="priority"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Priority
-          </label>
-          <select
-            id="priority"
-            name="priority"
-            value={formData.priority}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="urgent">Urgent</option>
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="priority"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Priority
+            </label>
+            <select
+              id="priority"
+              name="priority"
+              value={formData.priority}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
 
-        <div>
-          <label
-            htmlFor="status"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="open">Open</option>
-            <option value="assigned">Assigned</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </select>
-        </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label
+              htmlFor="description"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              rows="4"
+              required
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </div>
 
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label
-            htmlFor="description"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows="4"
-            required
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
-
-        <div style={{ gridColumn: "1 / -1" }}>
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              padding: "12px 18px",
-              border: "none",
-              borderRadius: "10px",
-              background: "#0b1f3a",
-              color: "#ffffff",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.7 : 1,
-            }}
-          >
-            {submitting ? "Creating..." : "Create Complaint"}
-          </button>
-        </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{
+                padding: "12px 18px",
+                border: "none",
+                borderRadius: "10px",
+                background: "#0b1f3a",
+                color: "#ffffff",
+                cursor: submitting ? "not-allowed" : "pointer",
+                opacity: submitting ? 0.7 : 1,
+              }}
+            >
+              {submitting ? "Creating..." : "Create Complaint"}
+            </button>
+          </div>
         </form>
       ) : null}
 
@@ -391,6 +372,7 @@ function Complaints() {
                 "Category",
                 "Priority",
                 "Status",
+                ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
                   key={heading}
@@ -417,12 +399,26 @@ function Complaints() {
                   <td style={cellStyle}>{complaint.category}</td>
                   <td style={cellStyle}>{complaint.priority}</td>
                   <td style={cellStyle}>{complaint.status}</td>
+                  {isAdmin ? (
+                    <td style={cellStyle}>
+                      <button
+                        type="button"
+                        onClick={() => handleCreateTask(complaint._id)}
+                        style={actionButtonStyle}
+                      >
+                        <span style={{ display: "inline-flex", marginRight: "8px" }}>
+                          <FaClipboardCheck />
+                        </span>
+                        Create Task
+                      </button>
+                    </td>
+                  ) : null}
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan="6"
+                  colSpan={isAdmin ? "7" : "6"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
@@ -452,6 +448,17 @@ const cellStyle = {
   padding: "14px",
   borderBottom: "1px solid #eef2f7",
   verticalAlign: "top",
+};
+
+const actionButtonStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "8px 12px",
+  border: "1px solid #d9e2ec",
+  borderRadius: "8px",
+  background: "#ffffff",
+  color: "#14213d",
+  cursor: "pointer",
 };
 
 export default Complaints;

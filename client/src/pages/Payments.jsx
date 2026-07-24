@@ -12,6 +12,34 @@ const initialFormData = {
   notes: "",
 };
 
+const currencyFormatter = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  maximumFractionDigits: 2,
+});
+
+const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+const formatPaymentDate = (value) => {
+  if (!value) {
+    return "-";
+  }
+
+  return dateFormatter.format(new Date(value));
+};
+
+const formatPaymentStatus = (status) => {
+  if (!status) {
+    return "-";
+  }
+
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
 function Payments() {
   const { user } = useAuth();
   const [payments, setPayments] = useState([]);
@@ -28,6 +56,7 @@ function Payments() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isAdmin = user?.role === "admin";
+  const isServiceProvider = user?.role === "service_provider";
 
   const resetForm = () => {
     setFormData({
@@ -153,8 +182,204 @@ function Payments() {
     );
   });
 
+  const normalizedUserEmail = user?.email?.trim().toLowerCase();
+
+  const providerPayments = [...payments]
+    .filter(
+      (payment) =>
+        payment.contract?.serviceProvider?.email?.trim().toLowerCase() ===
+        normalizedUserEmail
+    )
+    .sort((firstPayment, secondPayment) => {
+      const firstPaymentDate = firstPayment.paymentDate
+        ? new Date(firstPayment.paymentDate).getTime()
+        : 0;
+      const secondPaymentDate = secondPayment.paymentDate
+        ? new Date(secondPayment.paymentDate).getTime()
+        : 0;
+
+      return secondPaymentDate - firstPaymentDate;
+    });
+
+  const providerSummary = {
+    totalPayments: providerPayments.length,
+    totalAmountPaid: providerPayments.reduce((sum, payment) => {
+      if (payment.status !== "paid") {
+        return sum;
+      }
+
+      return sum + (Number(payment.amount) || 0);
+    }, 0),
+    pendingAmount: providerPayments.reduce((sum, payment) => {
+      if (payment.status !== "pending") {
+        return sum;
+      }
+
+      return sum + (Number(payment.amount) || 0);
+    }, 0),
+  };
+
   if (loading) {
     return <p>Loading payments...</p>;
+  }
+
+  if (isServiceProvider) {
+    return (
+      <section className="dashboard-page provider-payments-page">
+        <div className="dashboard-hero">
+          <div>
+            <p className="dashboard-eyebrow">Provider Payments</p>
+            <h1>My Payments</h1>
+            <p className="dashboard-subtitle">
+              View payments recorded for your service contracts.
+            </p>
+          </div>
+        </div>
+
+        {error ? <p style={{ color: "#c1121f" }}>{error}</p> : null}
+
+        {!providerPayments.length ? (
+          <section className="dashboard-section-card provider-payment-empty">
+            <div className="dashboard-section-header">
+              <div>
+                <h2>No Payments Found</h2>
+                <p>
+                  No payments have been recorded for your contracts yet.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="dashboard-section-card">
+              <div className="dashboard-section-header">
+                <div>
+                  <h2>Payment Summary</h2>
+                  <p>
+                    A quick overview of payment activity recorded for your
+                    contracts.
+                  </p>
+                </div>
+              </div>
+
+              <div className="dashboard-stats-grid">
+                <article className="dashboard-stat-card dashboard-stat-neutral">
+                  <span className="dashboard-stat-label">Total Payments</span>
+                  <strong className="dashboard-stat-value">
+                    {providerSummary.totalPayments}
+                  </strong>
+                </article>
+                <article className="dashboard-stat-card dashboard-stat-success">
+                  <span className="dashboard-stat-label">Total Amount Paid</span>
+                  <strong className="dashboard-stat-value dashboard-stat-value-currency">
+                    {currencyFormatter.format(providerSummary.totalAmountPaid)}
+                  </strong>
+                </article>
+                <article className="dashboard-stat-card dashboard-stat-warning">
+                  <span className="dashboard-stat-label">Pending Amount</span>
+                  <strong className="dashboard-stat-value dashboard-stat-value-currency">
+                    {currencyFormatter.format(providerSummary.pendingAmount)}
+                  </strong>
+                </article>
+              </div>
+            </section>
+
+            <section className="dashboard-section-card">
+              <div className="dashboard-section-header">
+                <div>
+                  <h2>Payment Records</h2>
+                  <p>
+                    Payments are ordered by payment date, with the newest
+                    entries shown first.
+                  </p>
+                </div>
+              </div>
+
+              <div className="provider-payments-table-wrap">
+                <table className="provider-payments-table">
+                  <thead>
+                    <tr>
+                      <th>Payment Date</th>
+                      <th>Contract Title</th>
+                      <th>Amount</th>
+                      <th>Payment Method</th>
+                      <th>Status</th>
+                      <th>Reference Number</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {providerPayments.map((payment) => (
+                      <tr key={payment._id}>
+                        <td>{formatPaymentDate(payment.paymentDate)}</td>
+                        <td>{payment.contract?.contractTitle || "-"}</td>
+                        <td>
+                          {currencyFormatter.format(Number(payment.amount) || 0)}
+                        </td>
+                        <td>{payment.paymentMethod || "-"}</td>
+                        <td>
+                          <span
+                            className={`provider-payment-status provider-payment-status-${payment.status}`}
+                          >
+                            {formatPaymentStatus(payment.status)}
+                          </span>
+                        </td>
+                        <td>{payment.referenceNumber || "-"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="provider-payments-card-list">
+                {providerPayments.map((payment) => (
+                  <article
+                    key={payment._id}
+                    className="provider-payments-card"
+                  >
+                    <div className="provider-payments-card-header">
+                      <div>
+                        <h3>
+                          {payment.contract?.contractTitle || "Contract Payment"}
+                        </h3>
+                        <p>{formatPaymentDate(payment.paymentDate)}</p>
+                      </div>
+                      <span
+                        className={`provider-payment-status provider-payment-status-${payment.status}`}
+                      >
+                        {formatPaymentStatus(payment.status)}
+                      </span>
+                    </div>
+
+                    <div className="provider-payments-card-grid">
+                      <div className="provider-payments-card-field">
+                        <span className="provider-payments-card-label">
+                          Amount
+                        </span>
+                        <strong>
+                          {currencyFormatter.format(Number(payment.amount) || 0)}
+                        </strong>
+                      </div>
+                      <div className="provider-payments-card-field">
+                        <span className="provider-payments-card-label">
+                          Payment Method
+                        </span>
+                        <strong>{payment.paymentMethod || "-"}</strong>
+                      </div>
+                      <div className="provider-payments-card-field">
+                        <span className="provider-payments-card-label">
+                          Reference Number
+                        </span>
+                        <strong>{payment.referenceNumber || "-"}</strong>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+      </section>
+    );
   }
 
   return (

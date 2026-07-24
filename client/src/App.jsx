@@ -28,9 +28,27 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/service-providers" element={<ServiceProviders />} />
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/complaints" element={<Complaints />} />
-            <Route path="/contracts" element={<Contracts />} />
-            <Route path="/payments" element={<Payments />} />
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin", "resident"]} />
+              }
+            >
+              <Route path="/complaints" element={<Complaints />} />
+            </Route>
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin", "service_provider"]} />
+              }
+            >
+              <Route path="/contracts" element={<Contracts />} />
+            </Route>
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin", "service_provider"]} />
+              }
+            >
+              <Route path="/payments" element={<Payments />} />
+            </Route>
           </Route>
         </Route>
       </Routes>
