@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { isEmailVerified } = require("../utils/emailVerification");
 
 const protect = async (req, res, next) => {
   try {
@@ -31,7 +32,10 @@ const protect = async (req, res, next) => {
       });
     }
 
-    req.user = user;
+    req.user = {
+      ...user.toObject(),
+      emailVerified: isEmailVerified(user),
+    };
     next();
   } catch (error) {
     return res.status(401).json({

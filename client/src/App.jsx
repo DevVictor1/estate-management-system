@@ -14,6 +14,7 @@ import Payments from "./pages/Payments";
 import Register from "./pages/Register";
 import ServiceProviders from "./pages/ServiceProviders";
 import Tasks from "./pages/Tasks";
+import VerifyEmail from "./pages/VerifyEmail";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<Layout />}>

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
 
 const initialFormData = {
   fullName: "",
@@ -16,11 +17,13 @@ const initialFormData = {
 };
 
 function Register() {
-  const navigate = useNavigate();
   const { register } = useAuth();
   const [formData, setFormData] = useState(initialFormData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successState, setSuccessState] = useState(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -30,9 +33,36 @@ function Register() {
     }));
   };
 
+  const handleResendVerification = async () => {
+    if (!successState?.email) {
+      return;
+    }
+
+    setResendLoading(true);
+    setResendMessage("");
+
+    try {
+      const response = await api.post("/api/auth/resend-verification", {
+        email: successState.email,
+      });
+
+      setResendMessage(
+        response.data?.message ||
+          "If an unverified account exists for that email, a new verification message has been sent."
+      );
+    } catch (err) {
+      setResendMessage(
+        "If an unverified account exists for that email, a new verification message has been sent."
+      );
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setResendMessage("");
     setLoading(true);
 
     try {
@@ -55,8 +85,15 @@ function Register() {
         }
       }
 
-      await register(payload);
-      navigate("/dashboard");
+      const response = await register(payload);
+      setSuccessState({
+        email: formData.email.trim(),
+        verificationEmailSent: response.verificationEmailSent === true,
+        message:
+          response.message ||
+          "Account created successfully. We sent a verification link to your email address.",
+      });
+      setFormData(initialFormData);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -66,6 +103,83 @@ function Register() {
       setLoading(false);
     }
   };
+
+  if (successState) {
+    return (
+      <div className="auth-page auth-page-register">
+        <div className="auth-card auth-card-register">
+          <h1 style={{ marginBottom: "8px" }}>Account Created</h1>
+          <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
+            Check your inbox to finish setting up your account.
+          </p>
+
+          <div
+            style={{
+              padding: "18px",
+              borderRadius: "14px",
+              background: successState.verificationEmailSent
+                ? "#dcfce7"
+                : "#fff4cc",
+              color: successState.verificationEmailSent ? "#166534" : "#9a6700",
+            }}
+          >
+            <p style={{ fontWeight: "700" }}>{successState.message}</p>
+            <p style={{ marginTop: "8px" }}>
+              Open the verification link before signing in.
+            </p>
+          </div>
+
+          {resendMessage ? (
+            <p style={{ marginTop: "16px", color: "#0b1f3a" }}>
+              {resendMessage}
+            </p>
+          ) : null}
+
+          <div
+            style={{
+              marginTop: "24px",
+              display: "flex",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <Link
+              to="/login"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "12px 16px",
+                borderRadius: "10px",
+                background: "#0b1f3a",
+                color: "#ffffff",
+                fontWeight: "600",
+              }}
+            >
+              Go to Login
+            </Link>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendLoading}
+              style={{
+                padding: "12px 16px",
+                borderRadius: "10px",
+                border: "1px solid #d9e2ec",
+                background: "#ffffff",
+                color: "#0b1f3a",
+                fontWeight: "600",
+                cursor: resendLoading ? "not-allowed" : "pointer",
+                opacity: resendLoading ? 0.7 : 1,
+              }}
+            >
+              {resendLoading ? "Sending..." : "Resend Verification Email"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page auth-page-register">
@@ -177,8 +291,9 @@ function Register() {
                 <option value="service_provider">Service Provider</option>
               </select>
               <p style={{ marginTop: "8px", color: "#6b7a90", fontSize: "0.95rem" }}>
-                Residents can submit complaints. Service providers will require
-                admin approval before being verified.
+                Residents can submit complaints. Service providers must verify
+                their email and still require admin approval before they can
+                access assigned work.
               </p>
             </div>
 
@@ -306,7 +421,7 @@ function Register() {
               opacity: loading ? 0.7 : 1,
             }}
           >
-            {loading ? "Registering..." : "Register"}
+            {loading ? "Creating Account..." : "Register"}
           </button>
         </form>
 

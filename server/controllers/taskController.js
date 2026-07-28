@@ -1,9 +1,21 @@
 const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
+const ServiceProvider = require("../models/ServiceProvider");
 const Task = require("../models/Task");
+const User = require("../models/User");
+const { getEmailConfig } = require("../config/email");
+const { sendEmail } = require("../services/emailService");
+const { buildTaskAssignedEmail } = require("../emailTemplates/taskAssigned");
+const { buildTaskCompletedEmail } = require("../emailTemplates/taskCompleted");
+const { isEmailVerified } = require("../utils/emailVerification");
+const {
+  resolveVerifiedUserEmailRecipient,
+} = require("../utils/verifiedRecipients");
 
 const providerAllowedStatuses = ["pending", "in_progress", "completed"];
 const creatableStatuses = ["pending", "in_progress", "overdue", "cancelled"];
+const isValidEmail = (value = "") =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 const applyTaskPopulates = (query, userRole) => {
   query
@@ -24,9 +36,93 @@ const applyTaskPopulates = (query, userRole) => {
   return query;
 };
 
+const getTasksReviewUrl = () => {
+  const clientUrl = process.env.CLIENT_URL;
+
+  if (!clientUrl || !/^https?:\/\//i.test(clientUrl)) {
+    return "";
+  }
+
+  return `${clientUrl.replace(/\/$/, "")}/tasks`;
+};
+
+const getComplaintsReviewUrl = () => {
+  const clientUrl = process.env.CLIENT_URL;
+
+  if (!clientUrl || !/^https?:\/\//i.test(clientUrl)) {
+    return "";
+  }
+
+  return `${clientUrl.replace(/\/$/, "")}/complaints`;
+};
+
+const getTaskAssignmentRecipient = (providerEmail) => {
+  const { emailProviderRecipient } = getEmailConfig();
+  return resolveVerifiedUserEmailRecipient({
+    overrideRecipient: emailProviderRecipient,
+    databaseEmail: providerEmail,
+    role: "service_provider",
+  }).then((recipients) => {
+    const source = emailProviderRecipient ? "environment override" : "provider database";
+
+    console.log(
+      `Task assignment recipient resolution: provider override configured: ${
+        emailProviderRecipient ? "yes" : "no"
+      }`
+    );
+    console.log(
+      `Task assignment recipient resolution: recipient source: ${source}, recipient count: ${recipients.length}`
+    );
+
+    return {
+      source,
+      recipients,
+    };
+  });
+};
+
+const getTaskCompletionRecipient = (residentEmail) => {
+  const { emailResidentRecipient } = getEmailConfig();
+  const source = emailResidentRecipient ? "environment override" : "resident database";
+
+  console.log(
+    `Task completion recipient resolution: resident override configured: ${emailResidentRecipient ? "yes" : "no"}`
+  );
+
+  if (emailResidentRecipient) {
+    const recipients = isValidEmail(String(emailResidentRecipient || "").trim())
+      ? [String(emailResidentRecipient || "").trim()]
+      : [];
+
+    console.log(
+      `Task completion recipient resolution: recipient source: ${source}, recipient count: ${recipients.length}`
+    );
+
+    return {
+      source,
+      recipients,
+    };
+  }
+
+  const normalizedResidentEmail = String(residentEmail || "").trim();
+  const recipients = isValidEmail(normalizedResidentEmail)
+    ? [normalizedResidentEmail]
+    : [];
+
+  console.log(
+    `Task completion recipient resolution: recipient source: ${source}, recipient count: ${recipients.length}`
+  );
+
+  return {
+    source,
+    recipients,
+  };
+};
+
 const createTask = async (req, res) => {
   try {
     const complaintId = req.body.complaint;
+    let linkedComplaint = null;
 
     if (complaintId !== undefined && complaintId !== null && complaintId !== "") {
       if (!mongoose.Types.ObjectId.isValid(complaintId)) {
@@ -36,9 +132,11 @@ const createTask = async (req, res) => {
         });
       }
 
-      const complaint = await Complaint.findById(complaintId).select("_id");
+      linkedComplaint = await Complaint.findById(complaintId)
+        .select("title category resident")
+        .populate("resident", "apartmentNumber");
 
-      if (!complaint) {
+      if (!linkedComplaint) {
         return res.status(404).json({
           success: false,
           message: "Complaint not found.",
@@ -94,6 +192,52 @@ const createTask = async (req, res) => {
     }
 
     const task = await Task.create(taskData);
+
+    try {
+      const provider = await ServiceProvider.findById(task.serviceProvider).select(
+        "companyName contactPerson email phone serviceCategory"
+      );
+
+      if (!provider) {
+        console.warn(
+          "Task created, but provider assignment email was skipped because the provider record could not be found."
+        );
+      } else {
+        const { recipients } = await getTaskAssignmentRecipient(provider.email);
+
+        if (!recipients.length) {
+          console.warn(
+            "Task created, but provider assignment email was skipped because no valid recipient was configured."
+          );
+        } else {
+          const template = buildTaskAssignedEmail({
+            providerName: provider.contactPerson || provider.companyName,
+            taskTitle: task.title,
+            taskDescription: task.description,
+            priority: task.priority,
+            deadline: task.deadline,
+            taskStatus: task.status,
+            complaintTitle: linkedComplaint?.title,
+            complaintCategory: linkedComplaint?.category,
+            apartmentNumber: linkedComplaint?.resident?.apartmentNumber,
+            reviewUrl: getTasksReviewUrl(),
+          });
+
+          const emailResult = await sendEmail({
+            to: recipients,
+            subject: template.subject,
+            html: template.html,
+            text: template.text,
+          });
+
+          if (!emailResult.success) {
+            console.warn("Task created, but provider assignment email failed.");
+          }
+        }
+      }
+    } catch (emailError) {
+      console.warn("Task created, but provider assignment email failed.");
+    }
 
     res.status(201).json({
       success: true,
@@ -248,10 +392,75 @@ const updateOwnTaskStatus = async (req, res) => {
       });
     }
 
+    const previousStatus = task.status;
+
     task.status = status;
     task.completedAt = status === "completed" ? new Date() : null;
 
     await task.save();
+
+    if (previousStatus !== "completed" && status === "completed") {
+      try {
+        if (!task.complaint) {
+          console.warn(
+            "Task completed, but resident notification email was skipped because the task has no linked complaint."
+          );
+        } else {
+          const linkedComplaint = await Complaint.findById(task.complaint)
+            .select("title resident")
+            .populate("resident", "fullName email apartmentNumber emailVerified");
+
+          if (!linkedComplaint) {
+            console.warn(
+              "Task completed, but resident notification email was skipped because the linked complaint could not be found."
+            );
+          } else if (!linkedComplaint.resident) {
+            console.warn(
+              "Task completed, but resident notification email was skipped because the linked resident could not be found."
+            );
+          } else {
+            const { recipients } = getTaskCompletionRecipient(
+              isEmailVerified(linkedComplaint.resident)
+                ? linkedComplaint.resident.email
+                : ""
+            );
+
+            if (!recipients.length) {
+              console.warn(
+                "Task completed, but resident notification email was skipped because no valid recipient was configured."
+              );
+            } else {
+              const template = buildTaskCompletedEmail({
+                residentName: linkedComplaint.resident.fullName,
+                taskTitle: task.title,
+                taskDescription: task.description,
+                complaintTitle: linkedComplaint.title,
+                serviceProviderName:
+                  task.serviceProvider?.companyName || "Assigned service provider",
+                completionNote: task.completionNote,
+                completedAt: task.completedAt,
+                reviewUrl: getComplaintsReviewUrl(),
+              });
+
+              const emailResult = await sendEmail({
+                to: recipients,
+                subject: template.subject,
+                html: template.html,
+                text: template.text,
+              });
+
+              if (!emailResult.success) {
+                console.warn(
+                  "Task completed, but resident notification email failed."
+                );
+              }
+            }
+          }
+        }
+      } catch (emailError) {
+        console.warn("Task completed, but resident notification email failed.");
+      }
+    }
 
     const updatedTask = await Task.findById(task._id)
       .populate("serviceProvider", "companyName serviceCategory phone email")

@@ -13,6 +13,13 @@ const initialFormData = {
   status: "open",
 };
 
+const initialComplaintFilters = {
+  searchTerm: "",
+  categoryFilter: "",
+  priorityFilter: "",
+  statusFilter: "",
+};
+
 function Complaints() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -32,6 +39,13 @@ function Complaints() {
 
   const resetForm = () => {
     setFormData(initialFormData);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm(initialComplaintFilters.searchTerm);
+    setCategoryFilter(initialComplaintFilters.categoryFilter);
+    setPriorityFilter(initialComplaintFilters.priorityFilter);
+    setStatusFilter(initialComplaintFilters.statusFilter);
   };
 
   const fetchPageData = async () => {
@@ -118,6 +132,12 @@ function Complaints() {
 
     return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
   });
+
+  const hasActiveFilters =
+    searchTerm.trim() !== initialComplaintFilters.searchTerm ||
+    categoryFilter !== initialComplaintFilters.categoryFilter ||
+    priorityFilter !== initialComplaintFilters.priorityFilter ||
+    statusFilter !== initialComplaintFilters.statusFilter;
 
   if (loading) {
     return <p>Loading complaints...</p>;
@@ -224,11 +244,21 @@ function Complaints() {
             </select>
           </div>
         </div>
-      </div>
 
-      <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredComplaints.length} of {complaints.length} complaints
-      </p>
+        <div className="filter-toolbar-actions">
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="clear-filters-button"
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
+          <span className="filter-results-count">
+            Showing {filteredComplaints.length} of {complaints.length} complaints
+          </span>
+        </div>
+      </div>
 
       {isResident ? (
         <form
@@ -425,7 +455,9 @@ function Complaints() {
                     color: "#6b7a90",
                   }}
                 >
-                  No complaints match the current filters.
+                  {complaints.length === 0
+                    ? "No complaints have been recorded yet."
+                    : "No complaints match your current filters."}
                 </td>
               </tr>
             )}

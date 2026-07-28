@@ -33,13 +33,6 @@ function AuthProvider({ children }) {
 
   const register = async (userData) => {
     const response = await api.post("/api/auth/register", userData);
-    const token = response.data.token;
-
-    if (token) {
-      localStorage.setItem("token", token);
-      await fetchLoggedInUser();
-    }
-
     return response.data;
   };
 

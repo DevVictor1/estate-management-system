@@ -11,6 +11,8 @@ function ProtectedRoute({ allowedRoles }) {
   const [isApprovedServiceProvider, setIsApprovedServiceProvider] =
     useState(true);
   const [providerStatusError, setProviderStatusError] = useState("");
+  const [isClearingUnverifiedSession, setIsClearingUnverifiedSession] =
+    useState(false);
 
   const handleLogout = () => {
     logout();
@@ -18,8 +20,29 @@ function ProtectedRoute({ allowedRoles }) {
   };
 
   useEffect(() => {
+    if (user?.emailVerified === false) {
+      setIsClearingUnverifiedSession(true);
+      logout();
+      navigate("/login", {
+        replace: true,
+        state: { emailVerificationRequired: true },
+      });
+      return;
+    }
+
+    setIsClearingUnverifiedSession(false);
+  }, [user, logout, navigate]);
+
+  useEffect(() => {
     const checkServiceProviderApproval = async () => {
       if (!user) {
+        setProviderStatusLoading(false);
+        setIsApprovedServiceProvider(true);
+        setProviderStatusError("");
+        return;
+      }
+
+      if (user.emailVerified === false) {
         setProviderStatusLoading(false);
         setIsApprovedServiceProvider(true);
         setProviderStatusError("");
@@ -64,6 +87,10 @@ function ProtectedRoute({ allowedRoles }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isClearingUnverifiedSession || user.emailVerified === false) {
+    return <p>Loading...</p>;
   }
 
   if (providerStatusLoading) {

@@ -13,6 +13,13 @@ const initialFormData = {
   notes: "",
 };
 
+const initialContractFilters = {
+  searchTerm: "",
+  statusFilter: "",
+  startDateFilter: "",
+  endDateFilter: "",
+};
+
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -78,6 +85,13 @@ function Contracts() {
       serviceProvider: providers[0]?._id || "",
     });
     setEditingContractId("");
+  };
+
+  const clearFilters = () => {
+    setSearchTerm(initialContractFilters.searchTerm);
+    setStatusFilter(initialContractFilters.statusFilter);
+    setStartDateFilter(initialContractFilters.startDateFilter);
+    setEndDateFilter(initialContractFilters.endDateFilter);
   };
 
   const fetchPageData = async () => {
@@ -215,6 +229,12 @@ function Contracts() {
 
     return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
   });
+
+  const hasActiveFilters =
+    searchTerm.trim() !== initialContractFilters.searchTerm ||
+    statusFilter !== initialContractFilters.statusFilter ||
+    startDateFilter !== initialContractFilters.startDateFilter ||
+    endDateFilter !== initialContractFilters.endDateFilter;
 
   const normalizedUserEmail = user?.email?.trim().toLowerCase();
 
@@ -467,7 +487,7 @@ function Contracts() {
   }
 
   return (
-    <section>
+    <section className="contracts-page">
       <div style={{ marginBottom: "24px" }}>
         <h1 style={{ marginBottom: "8px" }}>Contracts</h1>
         <p style={{ color: "#6b7a90" }}>
@@ -551,11 +571,21 @@ function Contracts() {
             />
           </div>
         </div>
-      </div>
 
-      <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredContracts.length} of {contracts.length} contracts
-      </p>
+        <div className="filter-toolbar-actions">
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="clear-filters-button"
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
+          <span className="filter-results-count">
+            Showing {filteredContracts.length} of {contracts.length} contracts
+          </span>
+        </div>
+      </div>
 
       {isAdmin ? (
         <form
@@ -767,15 +797,8 @@ function Contracts() {
         </form>
       ) : null}
 
-      <div
-        style={{
-          overflowX: "auto",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="contracts-table-wrapper">
+        <table className="contracts-table">
           <thead>
             <tr style={{ background: "#f8fafc" }}>
               {[
@@ -791,6 +814,19 @@ function Contracts() {
               ].map((heading) => (
                 <th
                   key={heading}
+                  className={
+                    heading === "Service Provider"
+                      ? "contract-provider-cell"
+                      : heading === "Contract Title"
+                      ? "contract-title-cell"
+                      : heading === "Payment Terms"
+                      ? "contract-payment-terms-cell"
+                      : heading === "Notes"
+                      ? "contract-notes-cell"
+                      : heading === "Actions"
+                      ? "contract-actions-cell"
+                      : undefined
+                  }
                   style={{
                     padding: "14px",
                     textAlign: "left",
@@ -806,10 +842,24 @@ function Contracts() {
             {filteredContracts.length > 0 ? (
               filteredContracts.map((contract) => (
                 <tr key={contract._id}>
-                  <td style={cellStyle}>
-                    {contract.serviceProvider?.companyName || "-"}
+                  <td
+                    style={cellStyle}
+                    className="contract-provider-cell"
+                    title={contract.serviceProvider?.companyName || "-"}
+                  >
+                    <span className="contract-provider-text">
+                      {contract.serviceProvider?.companyName || "-"}
+                    </span>
                   </td>
-                  <td style={cellStyle}>{contract.contractTitle}</td>
+                  <td
+                    style={cellStyle}
+                    className="contract-title-cell"
+                    title={contract.contractTitle || "-"}
+                  >
+                    <span className="contract-title-text">
+                      {contract.contractTitle || "-"}
+                    </span>
+                  </td>
                   <td style={cellStyle}>
                     {contract.startDate
                       ? new Date(contract.startDate).toLocaleDateString()
@@ -820,23 +870,34 @@ function Contracts() {
                       ? new Date(contract.endDate).toLocaleDateString()
                       : "-"}
                   </td>
-                  <td style={cellStyle}>{contract.paymentTerms || "-"}</td>
+                  <td
+                    style={cellStyle}
+                    className="contract-payment-terms-cell"
+                    title={contract.paymentTerms || "-"}
+                  >
+                    <span className="contract-payment-terms-text">
+                      {contract.paymentTerms || "-"}
+                    </span>
+                  </td>
                   <td style={cellStyle}>{contract.contractValue}</td>
                   <td style={cellStyle}>{contract.status}</td>
-                  <td style={cellStyle}>{contract.notes || "-"}</td>
+                  <td
+                    style={cellStyle}
+                    className="contract-notes-cell"
+                    title={contract.notes || "-"}
+                  >
+                    <span className="contract-notes-text">
+                      {contract.notes || "-"}
+                    </span>
+                  </td>
                   {isAdmin ? (
-                    <td style={cellStyle}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "8px",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                    <td style={cellStyle} className="contract-actions-cell">
+                      <div className="contract-action-row">
                         <button
                           type="button"
                           onClick={() => handleEdit(contract)}
                           style={actionButtonStyle}
+                          className="contract-action-button"
                         >
                           Edit
                         </button>
@@ -849,6 +910,7 @@ function Contracts() {
                             color: "#ffffff",
                             borderColor: "#c1121f",
                           }}
+                          className="contract-action-button"
                         >
                           Delete
                         </button>
@@ -867,7 +929,9 @@ function Contracts() {
                     color: "#6b7a90",
                   }}
                 >
-                  No contracts match the current filters.
+                  {contracts.length === 0
+                    ? "No contracts have been created yet."
+                    : "No contracts match your current filters."}
                 </td>
               </tr>
             )}

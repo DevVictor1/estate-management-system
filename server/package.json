@@ -4,7 +4,10 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "email:test": "node scripts/sendTestEmail.js",
+    "admin:recover-email": "node scripts/recoverAdminEmail.js",
+    "admin:inspect": "node scripts/inspectAdminAccount.js"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +19,8 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.6.0"
+    "mongoose": "^9.6.0",
+    "resend": "^6.18.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

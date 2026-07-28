@@ -1,11 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   FaArrowRight,
   FaClipboardList,
   FaComments,
+  FaFileCircleCheck,
   FaHourglassHalf,
   FaListCheck,
+  FaMoneyBillWave,
+  FaReceipt,
+  FaSquareCheck,
   FaTriangleExclamation,
   FaUsersGear,
 } from "react-icons/fa6";
@@ -48,6 +52,9 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
 });
 
+const dayInMs = 24 * 60 * 60 * 1000;
+const contractExpiringWindowInDays = 30;
+
 function Dashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState(initialStats);
@@ -59,6 +66,21 @@ function Dashboard() {
   const [providersLoading, setProvidersLoading] = useState(false);
   const [residentComplaintsError, setResidentComplaintsError] = useState("");
   const [providersError, setProvidersError] = useState("");
+  const [adminProviders, setAdminProviders] = useState([]);
+  const [adminComplaints, setAdminComplaints] = useState([]);
+  const [adminTasks, setAdminTasks] = useState([]);
+  const [adminContracts, setAdminContracts] = useState([]);
+  const [adminPayments, setAdminPayments] = useState([]);
+  const [adminProvidersLoading, setAdminProvidersLoading] = useState(false);
+  const [adminComplaintsLoading, setAdminComplaintsLoading] = useState(false);
+  const [adminTasksLoading, setAdminTasksLoading] = useState(false);
+  const [adminContractsLoading, setAdminContractsLoading] = useState(false);
+  const [adminPaymentsLoading, setAdminPaymentsLoading] = useState(false);
+  const [adminProvidersError, setAdminProvidersError] = useState("");
+  const [adminComplaintsError, setAdminComplaintsError] = useState("");
+  const [adminTasksError, setAdminTasksError] = useState("");
+  const [adminContractsError, setAdminContractsError] = useState("");
+  const [adminPaymentsError, setAdminPaymentsError] = useState("");
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
@@ -85,6 +107,109 @@ function Dashboard() {
     };
 
     fetchDashboardStats();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setAdminProviders([]);
+      setAdminComplaints([]);
+      setAdminTasks([]);
+      setAdminContracts([]);
+      setAdminPayments([]);
+      setAdminProvidersLoading(false);
+      setAdminComplaintsLoading(false);
+      setAdminTasksLoading(false);
+      setAdminContractsLoading(false);
+      setAdminPaymentsLoading(false);
+      setAdminProvidersError("");
+      setAdminComplaintsError("");
+      setAdminTasksError("");
+      setAdminContractsError("");
+      setAdminPaymentsError("");
+      return;
+    }
+
+    const fetchAdminProviders = async () => {
+      setAdminProvidersLoading(true);
+      setAdminProvidersError("");
+
+      try {
+        const response = await api.get("/api/service-providers");
+        setAdminProviders(response.data.data || []);
+      } catch (err) {
+        setAdminProvidersError(
+          "We couldn't load service provider approvals right now."
+        );
+      } finally {
+        setAdminProvidersLoading(false);
+      }
+    };
+
+    const fetchAdminComplaints = async () => {
+      setAdminComplaintsLoading(true);
+      setAdminComplaintsError("");
+
+      try {
+        const response = await api.get("/api/complaints");
+        setAdminComplaints(response.data.data || []);
+      } catch (err) {
+        setAdminComplaintsError(
+          "We couldn't load complaint previews right now."
+        );
+      } finally {
+        setAdminComplaintsLoading(false);
+      }
+    };
+
+    const fetchAdminTasks = async () => {
+      setAdminTasksLoading(true);
+      setAdminTasksError("");
+
+      try {
+        const response = await api.get("/api/tasks");
+        setAdminTasks(response.data.data || []);
+      } catch (err) {
+        setAdminTasksError("We couldn't load task previews right now.");
+      } finally {
+        setAdminTasksLoading(false);
+      }
+    };
+
+    const fetchAdminContracts = async () => {
+      setAdminContractsLoading(true);
+      setAdminContractsError("");
+
+      try {
+        const response = await api.get("/api/contracts");
+        setAdminContracts(response.data.data || []);
+      } catch (err) {
+        setAdminContractsError(
+          "We couldn't load contract reminders right now."
+        );
+      } finally {
+        setAdminContractsLoading(false);
+      }
+    };
+
+    const fetchAdminPayments = async () => {
+      setAdminPaymentsLoading(true);
+      setAdminPaymentsError("");
+
+      try {
+        const response = await api.get("/api/payments");
+        setAdminPayments(response.data.data || []);
+      } catch (err) {
+        setAdminPaymentsError("We couldn't load payment previews right now.");
+      } finally {
+        setAdminPaymentsLoading(false);
+      }
+    };
+
+    fetchAdminProviders();
+    fetchAdminComplaints();
+    fetchAdminTasks();
+    fetchAdminContracts();
+    fetchAdminPayments();
   }, [isAdmin]);
 
   useEffect(() => {
@@ -138,6 +263,140 @@ function Dashboard() {
     fetchResidentComplaints();
     fetchApprovedProviders();
   }, [isResident]);
+
+  const adminOverview = useMemo(() => {
+    const pendingProviderApprovals = adminProviders.filter(
+      (provider) => provider.verificationStatus === "pending"
+    );
+    const openComplaints = adminComplaints.filter(
+      (complaint) => complaint.status === "open"
+    );
+    const assignedComplaints = adminComplaints.filter(
+      (complaint) => complaint.status === "assigned"
+    );
+    const highPriorityOpenComplaints = adminComplaints
+      .filter(
+        (complaint) =>
+          complaint.status === "open" &&
+          (complaint.priority === "high" || complaint.priority === "urgent")
+      )
+      .sort(sortByDateDesc("createdAt"));
+    const overdueTasks = adminTasks
+      .filter((task) => task.status === "overdue")
+      .sort(sortByDateAsc("deadline"));
+    const activeTasks = adminTasks.filter(
+      (task) =>
+        task.status === "pending" ||
+        task.status === "in_progress" ||
+        task.status === "overdue"
+    );
+    const expiringContracts = adminContracts
+      .filter((contract) => {
+        if (!contract.endDate) {
+          return false;
+        }
+
+        const endDate = new Date(contract.endDate).getTime();
+        const now = Date.now();
+        const threshold = now + contractExpiringWindowInDays * dayInMs;
+
+        return endDate >= now && endDate <= threshold;
+      })
+      .sort(sortByDateAsc("endDate"));
+    const pendingPayments = adminPayments
+      .filter((payment) => payment.status === "pending")
+      .sort(sortByDateDesc("paymentDate"));
+    const recentComplaints = [...adminComplaints]
+      .sort(sortByDateDesc("createdAt"))
+      .slice(0, 5);
+    const upcomingOrOverdueTasks = [...activeTasks]
+      .sort((firstTask, secondTask) => {
+        const firstIsOverdue = firstTask.status === "overdue" ? 0 : 1;
+        const secondIsOverdue = secondTask.status === "overdue" ? 0 : 1;
+
+        if (firstIsOverdue !== secondIsOverdue) {
+          return firstIsOverdue - secondIsOverdue;
+        }
+
+        return sortByDateAsc("deadline")(firstTask, secondTask);
+      })
+      .slice(0, 5);
+
+    return {
+      pendingProviderApprovals,
+      openComplaints,
+      assignedComplaints,
+      activeTasks,
+      overdueTasks,
+      expiringContracts,
+      pendingPayments,
+      highPriorityOpenComplaints,
+      recentComplaints,
+      upcomingOrOverdueTasks,
+    };
+  }, [adminComplaints, adminContracts, adminPayments, adminProviders, adminTasks]);
+
+  const adminStatCards = useMemo(
+    () => [
+      {
+        label: "Total Service Providers",
+        value: stats.providers.total,
+        tone: "neutral",
+        icon: FaUsersGear,
+        helper: "All registered providers",
+      },
+      {
+        label: "Pending Provider Approvals",
+        value: adminOverview.pendingProviderApprovals.length,
+        tone: "warning",
+        icon: FaHourglassHalf,
+        helper: "Awaiting estate review",
+      },
+      {
+        label: "Open Complaints",
+        value: stats.complaints.open,
+        tone: "warning",
+        icon: FaComments,
+        helper: "Still awaiting action",
+      },
+      {
+        label: "Assigned Complaints",
+        value: adminOverview.assignedComplaints.length,
+        tone: "neutral",
+        icon: FaSquareCheck,
+        helper: "Already routed for work",
+      },
+      {
+        label: "Active Tasks",
+        value: adminOverview.activeTasks.length,
+        tone: "neutral",
+        icon: FaClipboardList,
+        helper: "Pending, in progress, or overdue",
+      },
+      {
+        label: "Overdue Tasks",
+        value: stats.tasks.overdue,
+        tone: "danger",
+        icon: FaTriangleExclamation,
+        helper: "Need immediate follow-up",
+      },
+      {
+        label: "Active Contracts",
+        value: stats.contracts.active,
+        tone: "success",
+        icon: FaFileCircleCheck,
+        helper: "Currently in force",
+      },
+      {
+        label: "Pending Payments",
+        value: adminOverview.pendingPayments.length,
+        tone: "warning",
+        icon: FaReceipt,
+        helper: "Waiting to be settled",
+      },
+    ],
+    [adminOverview, stats]
+  );
 
   if (loading) {
     return <p>Loading dashboard stats...</p>;
@@ -460,131 +719,442 @@ function Dashboard() {
     );
   }
 
-  if (error) {
-    return <p style={{ color: "#c1121f" }}>{error}</p>;
-  }
-
-  const sections = [
-    {
-      title: "Service Providers",
-      description: "Overview of registered providers and verification progress.",
-      items: [
-        {
-          label: "Total Providers",
-          value: stats.providers.total,
-          tone: "neutral",
-        },
-        {
-          label: "Approved Providers",
-          value: stats.providers.approved,
-          tone: "success",
-        },
-      ],
-    },
-    {
-      title: "Tasks",
-      description: "Track assignments, completions, and overdue work.",
-      items: [
-        { label: "Total Tasks", value: stats.tasks.total, tone: "neutral" },
-        { label: "Pending Tasks", value: stats.tasks.pending, tone: "warning" },
-        {
-          label: "Completed Tasks",
-          value: stats.tasks.completed,
-          tone: "success",
-        },
-        { label: "Overdue Tasks", value: stats.tasks.overdue, tone: "danger" },
-      ],
-    },
-    {
-      title: "Complaints",
-      description: "Monitor resident issues and their resolution progress.",
-      items: [
-        {
-          label: "Total Complaints",
-          value: stats.complaints.total,
-          tone: "neutral",
-        },
-        {
-          label: "Open Complaints",
-          value: stats.complaints.open,
-          tone: "warning",
-        },
-        {
-          label: "Resolved Complaints",
-          value: stats.complaints.resolved,
-          tone: "success",
-        },
-      ],
-    },
-    {
-      title: "Contracts",
-      description: "Active service agreements currently running in the estate.",
-      items: [
-        {
-          label: "Active Contracts",
-          value: stats.contracts.active,
-          tone: "success",
-        },
-      ],
-    },
-    {
-      title: "Payments",
-      description: "Summary of completed provider payouts.",
-      items: [
-        {
-          label: "Total Paid Amount",
-          value: currencyFormatter.format(stats.payments.totalPaid || 0),
-          tone: "success",
-          emphasis: "currency",
-        },
-      ],
-    },
-  ];
+  const firstName = user?.fullName?.trim()?.split(/\s+/)?.[0] || "Admin";
+  const totalPaidAmount = currencyFormatter.format(stats.payments.totalPaid || 0);
+  const adminAttentionItems = [
+    ...adminOverview.pendingProviderApprovals
+      .slice(0, 2)
+      .map((provider) => ({
+        key: `provider-${provider._id}`,
+        title: provider.companyName || "Pending service provider",
+        subtitle: "Verification approval pending",
+        meta: provider.serviceCategory
+          ? formatResidentComplaintStatus(provider.serviceCategory)
+          : "Review provider details",
+        tone: "warning",
+        route: "/service-providers",
+        actionLabel: "Review Provider",
+      })),
+    ...adminOverview.highPriorityOpenComplaints
+      .slice(0, 2)
+      .map((complaint) => ({
+        key: `complaint-${complaint._id}`,
+        title: complaint.title || "Urgent complaint",
+        subtitle: "High-priority complaint needs triage",
+        meta: `${
+          formatResidentComplaintStatus(complaint.priority)
+        } priority`,
+        tone: "danger",
+        route: "/complaints",
+        actionLabel: "Review Complaint",
+      })),
+    ...adminOverview.overdueTasks.slice(0, 2).map((task) => ({
+      key: `task-${task._id}`,
+      title: task.title || "Overdue task",
+      subtitle: task.serviceProvider?.companyName || "Assigned task",
+      meta: task.deadline
+        ? `Due ${dateFormatter.format(new Date(task.deadline))}`
+        : "Deadline not provided",
+      tone: "danger",
+      route: "/tasks",
+      actionLabel: "Open Tasks",
+    })),
+    ...adminOverview.expiringContracts.slice(0, 2).map((contract) => ({
+      key: `contract-${contract._id}`,
+      title: contract.contractTitle || "Expiring contract",
+      subtitle: contract.serviceProvider?.companyName || "Contract review due",
+      meta: contract.endDate
+        ? `Ends ${dateFormatter.format(new Date(contract.endDate))}`
+        : "End date not available",
+      tone: "warning",
+      route: "/contracts",
+      actionLabel: "View Contracts",
+    })),
+    ...adminOverview.pendingPayments.slice(0, 2).map((payment) => ({
+      key: `payment-${payment._id}`,
+      title:
+        payment.serviceProvider?.companyName ||
+        payment.contract?.contractTitle ||
+        "Pending payment",
+      subtitle: "Payment record still pending",
+      meta: currencyFormatter.format(payment.amount || 0),
+      tone: "warning",
+      route: "/payments",
+      actionLabel: "Open Payments",
+    })),
+  ].slice(0, 5);
 
   return (
-    <section className="dashboard-page">
-      <div className="dashboard-hero">
+    <section className="dashboard-page admin-dashboard">
+      <div className="dashboard-hero admin-dashboard-header">
         <div>
           <p className="dashboard-eyebrow">Operations Overview</p>
-          <h1>Dashboard</h1>
+          <h1>Welcome back, {firstName}</h1>
           <p className="dashboard-subtitle">
-            A quick summary of provider activity, task progress, complaints,
-            contracts, and payments across the estate.
+            Here’s what is happening across the estate today.
           </p>
         </div>
       </div>
 
-      <div className="dashboard-sections">
-        {sections.map((section) => (
-          <section key={section.title} className="dashboard-section-card">
-            <div className="dashboard-section-header">
-              <div>
-                <h2>{section.title}</h2>
-                <p>{section.description}</p>
-              </div>
-            </div>
+      {error ? (
+        <p className="admin-section-error">
+          We couldn't load the top-line statistics right now. The preview
+          sections below may still be available.
+        </p>
+      ) : null}
 
-            <div className="dashboard-stats-grid">
-              {section.items.map((item) => (
+      <section className="dashboard-section-card admin-overview-section">
+        <div className="dashboard-section-header">
+          <div>
+            <h2>Overview</h2>
+            <p>
+              Track provider verification, complaint activity, task progress,
+              contracts, and payments at a glance.
+            </p>
+          </div>
+        </div>
+
+        <div className="admin-stat-grid">
+          {adminStatCards.map((card) => {
+            const Icon = card.icon;
+
+            return (
+              <article
+                key={card.label}
+                className={`admin-stat-card admin-stat-card-${card.tone}`}
+              >
+                <div className="admin-stat-card-top">
+                  <span className="admin-stat-icon">
+                    <Icon />
+                  </span>
+                  <span className="admin-stat-label">{card.label}</span>
+                </div>
+                <strong className="admin-stat-value">{card.value}</strong>
+                <p className="admin-stat-helper">{card.helper}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="dashboard-section-card">
+        <div className="dashboard-section-header">
+          <div>
+            <h2>Quick Actions</h2>
+            <p>Move quickly to the areas that need attention today.</p>
+          </div>
+        </div>
+
+        <div className="admin-quick-actions">
+          <Link to="/complaints" className="admin-action-card">
+            <span className="admin-action-icon">
+              <FaComments />
+            </span>
+            <div>
+              <h3>Review Complaints</h3>
+              <p>Monitor resident issues and triage new reports.</p>
+            </div>
+            <span className="admin-action-arrow">
+              <FaArrowRight />
+            </span>
+          </Link>
+
+          <Link to="/service-providers" className="admin-action-card">
+            <span className="admin-action-icon">
+              <FaUsersGear />
+            </span>
+            <div>
+              <h3>View Pending Providers</h3>
+              <p>Approve or reject new provider registrations.</p>
+            </div>
+            <span className="admin-action-arrow">
+              <FaArrowRight />
+            </span>
+          </Link>
+
+          <Link to="/tasks" className="admin-action-card">
+            <span className="admin-action-icon">
+              <FaClipboardList />
+            </span>
+            <div>
+              <h3>Manage Tasks</h3>
+              <p>Track assignments, deadlines, and follow-ups.</p>
+            </div>
+            <span className="admin-action-arrow">
+              <FaArrowRight />
+            </span>
+          </Link>
+
+          <Link to="/contracts" className="admin-action-card">
+            <span className="admin-action-icon">
+              <FaFileCircleCheck />
+            </span>
+            <div>
+              <h3>Add Contract</h3>
+              <p>Create or review provider contract records.</p>
+            </div>
+            <span className="admin-action-arrow">
+              <FaArrowRight />
+            </span>
+          </Link>
+
+          <Link to="/payments" className="admin-action-card">
+            <span className="admin-action-icon">
+              <FaMoneyBillWave />
+            </span>
+            <div>
+              <h3>Record Payment</h3>
+              <p>Capture payment activity and pending settlements.</p>
+            </div>
+            <span className="admin-action-arrow">
+              <FaArrowRight />
+            </span>
+          </Link>
+        </div>
+      </section>
+
+      <div className="admin-dashboard-grid">
+        <section className="dashboard-section-card">
+          <div className="dashboard-section-header">
+            <div>
+              <h2>Attention Required</h2>
+              <p>
+                High-priority items, overdue work, upcoming expiries, and
+                pending approvals.
+              </p>
+            </div>
+          </div>
+
+          {hasAnySectionError([
+            adminProvidersError,
+            adminComplaintsError,
+            adminTasksError,
+            adminContractsError,
+            adminPaymentsError,
+          ]) ? (
+            <p className="admin-section-error">
+              Some attention items may be missing because one or more preview
+              sources could not be loaded.
+            </p>
+          ) : null}
+
+          {hasAnySectionLoading([
+            adminProvidersLoading,
+            adminComplaintsLoading,
+            adminTasksLoading,
+            adminContractsLoading,
+            adminPaymentsLoading,
+          ]) && adminAttentionItems.length === 0 ? (
+            <p>Loading attention items...</p>
+          ) : adminAttentionItems.length > 0 ? (
+            <div className="admin-attention-grid">
+              {adminAttentionItems.map((item) => (
                 <article
-                  key={item.label}
-                  className={`dashboard-stat-card dashboard-stat-${item.tone}`}
+                  key={item.key}
+                  className={`admin-preview-item admin-preview-item-${item.tone}`}
                 >
-                  <span className="dashboard-stat-label">{item.label}</span>
-                  <strong
-                    className={
-                      item.emphasis === "currency"
-                        ? "dashboard-stat-value dashboard-stat-value-currency"
-                        : "dashboard-stat-value"
-                    }
-                  >
-                    {item.value}
-                  </strong>
+                  <div className="admin-preview-main">
+                    <div>
+                      <h3>{item.title}</h3>
+                      <p>{item.subtitle}</p>
+                    </div>
+                    <span className={`admin-status-badge admin-status-badge-${item.tone}`}>
+                      {item.meta}
+                    </span>
+                  </div>
+                  <Link to={item.route} className="admin-inline-link">
+                    {item.actionLabel}
+                  </Link>
                 </article>
               ))}
             </div>
-          </section>
-        ))}
+          ) : (
+            <div className="admin-empty-state">
+              <h3>All clear for now</h3>
+              <p>
+                No urgent approvals, overdue tasks, high-priority complaints,
+                expiring contracts, or pending payments need immediate action.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className="dashboard-section-card">
+          <div className="dashboard-section-header">
+            <div>
+              <h2>Payment Snapshot</h2>
+              <p>
+                Keep an eye on pending settlements while tracking overall paid
+                volume.
+              </p>
+            </div>
+          </div>
+
+          {adminPaymentsError ? (
+            <p className="admin-section-error">{adminPaymentsError}</p>
+          ) : null}
+
+          <div className="admin-finance-card">
+            <div className="admin-finance-item">
+              <span className="admin-finance-label">Total Paid</span>
+              <strong>{totalPaidAmount}</strong>
+            </div>
+            <div className="admin-finance-item">
+              <span className="admin-finance-label">Pending Payments</span>
+              <strong>{adminOverview.pendingPayments.length}</strong>
+            </div>
+          </div>
+
+          {adminPaymentsLoading && adminOverview.pendingPayments.length === 0 ? (
+            <p>Loading payment preview...</p>
+          ) : adminOverview.pendingPayments.length > 0 ? (
+            <div className="admin-preview-list">
+              {adminOverview.pendingPayments.slice(0, 3).map((payment) => (
+                <article key={payment._id} className="admin-preview-item">
+                  <div className="admin-preview-main">
+                    <div>
+                      <h3>{payment.serviceProvider?.companyName || "Pending payment"}</h3>
+                      <p>
+                        {payment.paymentDate
+                          ? `Recorded ${dateFormatter.format(
+                              new Date(payment.paymentDate)
+                            )}`
+                          : "Payment date not available"}
+                      </p>
+                    </div>
+                    <span className="admin-status-badge admin-status-badge-warning">
+                      {currencyFormatter.format(payment.amount || 0)}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-empty-subtle">
+              No pending payments are waiting to be recorded.
+            </p>
+          )}
+        </section>
+      </div>
+
+      <div className="admin-dashboard-grid">
+        <section className="dashboard-section-card">
+          <div className="dashboard-section-header admin-section-header-row">
+            <div>
+              <h2>Recent Complaints</h2>
+              <p>The latest complaints reported by residents.</p>
+            </div>
+            <Link to="/complaints" className="admin-inline-link">
+              Review Complaints
+            </Link>
+          </div>
+
+          {adminComplaintsError ? (
+            <p className="admin-section-error">{adminComplaintsError}</p>
+          ) : null}
+
+          {adminComplaintsLoading && adminOverview.recentComplaints.length === 0 ? (
+            <p>Loading recent complaints...</p>
+          ) : adminOverview.recentComplaints.length > 0 ? (
+            <div className="admin-preview-list">
+              {adminOverview.recentComplaints.map((complaint) => (
+                <article key={complaint._id} className="admin-preview-item">
+                  <div className="admin-preview-main">
+                    <div>
+                      <h3>{complaint.title}</h3>
+                      <p>
+                        {complaint.resident?.fullName || "Resident not available"}
+                        {" • "}
+                        {formatResidentComplaintStatus(complaint.category)}
+                      </p>
+                    </div>
+                    <span
+                      className={`admin-status-badge admin-status-badge-${getComplaintTone(
+                        complaint.status
+                      )}`}
+                    >
+                      {formatResidentComplaintStatus(complaint.status)}
+                    </span>
+                  </div>
+                  <div className="admin-preview-meta">
+                    <span>Priority: {formatResidentComplaintStatus(complaint.priority)}</span>
+                    <span>
+                      Provider: {complaint.serviceProvider?.companyName || "-"}
+                    </span>
+                    <span>
+                      Submitted:{" "}
+                      {complaint.createdAt
+                        ? dateFormatter.format(new Date(complaint.createdAt))
+                        : "-"}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-empty-subtle">
+              No complaints have been submitted yet.
+            </p>
+          )}
+        </section>
+
+        <section className="dashboard-section-card">
+          <div className="dashboard-section-header admin-section-header-row">
+            <div>
+              <h2>Upcoming or Overdue Tasks</h2>
+              <p>Overdue work is shown first, followed by nearest deadlines.</p>
+            </div>
+            <Link to="/tasks" className="admin-inline-link">
+              Manage Tasks
+            </Link>
+          </div>
+
+          {adminTasksError ? (
+            <p className="admin-section-error">{adminTasksError}</p>
+          ) : null}
+
+          {adminTasksLoading && adminOverview.upcomingOrOverdueTasks.length === 0 ? (
+            <p>Loading task preview...</p>
+          ) : adminOverview.upcomingOrOverdueTasks.length > 0 ? (
+            <div className="admin-preview-list">
+              {adminOverview.upcomingOrOverdueTasks.map((task) => (
+                <article key={task._id} className="admin-preview-item">
+                  <div className="admin-preview-main">
+                    <div>
+                      <h3>{task.title}</h3>
+                      <p>{task.serviceProvider?.companyName || "Service provider not assigned"}</p>
+                    </div>
+                    <span
+                      className={`admin-status-badge admin-status-badge-${getTaskTone(
+                        task.status
+                      )}`}
+                    >
+                      {task.status === "overdue"
+                        ? "Overdue"
+                        : formatResidentComplaintStatus(task.status)}
+                    </span>
+                  </div>
+                  <div className="admin-preview-meta">
+                    <span>
+                      Deadline:{" "}
+                      {task.deadline
+                        ? dateFormatter.format(new Date(task.deadline))
+                        : "-"}
+                    </span>
+                    <span>
+                      Priority: {formatResidentComplaintStatus(task.priority)}
+                    </span>
+                    <span>Status: {formatResidentComplaintStatus(task.status)}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="admin-empty-subtle">
+              No active or overdue tasks need immediate review.
+            </p>
+          )}
+        </section>
       </div>
     </section>
   );
@@ -599,6 +1169,70 @@ function formatResidentComplaintStatus(value) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function sortByDateDesc(field) {
+  return (firstItem, secondItem) => {
+    const firstValue = firstItem[field] ? new Date(firstItem[field]).getTime() : 0;
+    const secondValue = secondItem[field]
+      ? new Date(secondItem[field]).getTime()
+      : 0;
+
+    return secondValue - firstValue;
+  };
+}
+
+function sortByDateAsc(field) {
+  return (firstItem, secondItem) => {
+    const firstValue = firstItem[field]
+      ? new Date(firstItem[field]).getTime()
+      : Number.MAX_SAFE_INTEGER;
+    const secondValue = secondItem[field]
+      ? new Date(secondItem[field]).getTime()
+      : Number.MAX_SAFE_INTEGER;
+
+    return firstValue - secondValue;
+  };
+}
+
+function getComplaintTone(status) {
+  if (status === "resolved" || status === "closed") {
+    return "success";
+  }
+
+  if (status === "assigned" || status === "in_progress") {
+    return "neutral";
+  }
+
+  if (status === "open") {
+    return "warning";
+  }
+
+  return "neutral";
+}
+
+function getTaskTone(status) {
+  if (status === "overdue") {
+    return "danger";
+  }
+
+  if (status === "completed") {
+    return "success";
+  }
+
+  if (status === "pending") {
+    return "warning";
+  }
+
+  return "neutral";
+}
+
+function hasAnySectionLoading(values) {
+  return values.some(Boolean);
+}
+
+function hasAnySectionError(values) {
+  return values.some(Boolean);
 }
 
 export default Dashboard;

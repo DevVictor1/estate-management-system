@@ -1,11 +1,87 @@
 const mongoose = require("mongoose");
 const Complaint = require("../models/Complaint");
 const ServiceProvider = require("../models/ServiceProvider");
+const User = require("../models/User");
+const { getEmailConfig } = require("../config/email");
+const { sendEmail } = require("../services/emailService");
+const {
+  buildComplaintSubmittedEmail,
+} = require("../emailTemplates/complaintSubmitted");
+const { isEmailVerified } = require("../utils/emailVerification");
+
+const isValidEmail = (value = "") =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const getComplaintNotificationRecipients = async () => {
+  const { emailAdminRecipient } = getEmailConfig();
+  const overrideRecipient = String(emailAdminRecipient || "").trim();
+
+  console.log(
+    `Complaint notification recipient resolution: admin override configured: ${overrideRecipient ? "yes" : "no"}`
+  );
+
+  if (overrideRecipient) {
+    if (!isValidEmail(overrideRecipient)) {
+      console.warn(
+        "Complaint notification recipient resolution: recipient source: environment override, recipient count: 0"
+      );
+
+      return {
+        source: "environment override",
+        recipients: [],
+      };
+    }
+
+    console.log(
+      "Complaint notification recipient resolution: recipient source: environment override, recipient count: 1"
+    );
+
+    return {
+      source: "environment override",
+      recipients: [overrideRecipient],
+    };
+  }
+
+  const adminUsers = await User.find({
+    role: "admin",
+    isActive: true,
+    emailVerified: { $ne: false },
+  }).select("email");
+
+  const recipients = [
+    ...new Set(
+      adminUsers
+        .map((admin) => String(admin.email || "").trim())
+        .filter(Boolean)
+        .filter(isValidEmail)
+    ),
+  ];
+
+  console.log(
+    `Complaint notification recipient resolution: recipient source: database, recipient count: ${recipients.length}`
+  );
+
+  return {
+    source: "database",
+    recipients,
+  };
+};
+
+const getComplaintsReviewUrl = () => {
+  const clientUrl = process.env.CLIENT_URL;
+
+  if (!clientUrl || !/^https?:\/\//i.test(clientUrl)) {
+    return "";
+  }
+
+  return `${clientUrl.replace(/\/$/, "")}/complaints`;
+};
 
 const createComplaint = async (req, res) => {
   try {
+    const isResidentComplaint = req.user?.role === "resident";
     const complaintData =
-      req.user?.role === "resident"
+      isResidentComplaint
         ? {
             title: req.body.title,
             description: req.body.description,
@@ -17,6 +93,46 @@ const createComplaint = async (req, res) => {
         : { ...req.body };
 
     const complaint = await Complaint.create(complaintData);
+
+    if (isResidentComplaint) {
+      try {
+        const { recipients } = await getComplaintNotificationRecipients();
+
+        if (!recipients.length) {
+          console.warn(
+            "Complaint created, but admin notification email was skipped because no valid recipient was configured."
+          );
+        } else {
+          const template = buildComplaintSubmittedEmail({
+            complaintTitle: complaint.title,
+            description: complaint.description,
+            category: complaint.category,
+            priority: complaint.priority,
+            residentName: req.user?.fullName,
+            apartmentNumber: req.user?.apartmentNumber,
+            submittedAt: complaint.createdAt,
+            reviewUrl: getComplaintsReviewUrl(),
+          });
+
+          const emailResult = await sendEmail({
+            to: recipients,
+            subject: template.subject,
+            html: template.html,
+            text: template.text,
+          });
+
+          if (!emailResult.success) {
+            console.warn(
+              "Complaint created, but admin notification email failed."
+            );
+          }
+        }
+      } catch (emailError) {
+        console.warn(
+          "Complaint created, but admin notification email failed."
+        );
+      }
+    }
 
     res.status(201).json({
       success: true,

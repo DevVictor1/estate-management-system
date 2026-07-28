@@ -15,6 +15,12 @@ const initialFormData = {
 
 const providerAllowedStatuses = ["pending", "in_progress", "completed"];
 
+const initialTaskFilters = {
+  searchTerm: "",
+  priorityFilter: "",
+  statusFilter: "",
+};
+
 function Tasks() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,6 +41,12 @@ function Tasks() {
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
+
+  const clearTaskFilters = () => {
+    setSearchTerm(initialTaskFilters.searchTerm);
+    setPriorityFilter(initialTaskFilters.priorityFilter);
+    setStatusFilter(initialTaskFilters.statusFilter);
+  };
 
   const complaintPrefillRequestId =
     isAdmin &&
@@ -356,6 +368,11 @@ function Tasks() {
     return matchesSearch && matchesPriority && matchesStatus;
   });
 
+  const hasActiveFilters =
+    searchTerm.trim() !== initialTaskFilters.searchTerm ||
+    priorityFilter !== initialTaskFilters.priorityFilter ||
+    statusFilter !== initialTaskFilters.statusFilter;
+
   const serviceProviderSummary = {
     total: serviceProviderTasks.length,
     pending: serviceProviderTasks.filter((task) => task.status === "pending")
@@ -385,7 +402,7 @@ function Tasks() {
   }
 
   return (
-    <section>
+    <section className="tasks-page">
       <div style={{ marginBottom: "24px" }}>
         <h1 style={{ marginBottom: "8px" }}>
           {isServiceProvider ? "My Assigned Tasks" : "Tasks"}
@@ -553,7 +570,7 @@ function Tasks() {
         </div>
       ) : null}
 
-      <div className="filter-card">
+      <div className="filter-card task-filter-toolbar">
         <div className="filter-grid">
           <div className="filter-group">
             <label className="filter-label" htmlFor="taskSearch">
@@ -614,11 +631,21 @@ function Tasks() {
             </select>
           </div>
         </div>
-      </div>
 
-      <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredTasks.length} of {visibleTasks.length} tasks
-      </p>
+        <div className="task-filter-toolbar-actions">
+          <button
+            type="button"
+            onClick={clearTaskFilters}
+            className="clear-filters-button"
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
+          <span className="filter-results-count">
+            Showing {filteredTasks.length} of {visibleTasks.length} tasks
+          </span>
+        </div>
+      </div>
 
       {isAdmin || (isServiceProvider && editingTaskId) ? (
         <form
@@ -836,15 +863,8 @@ function Tasks() {
         </form>
       ) : null}
 
-      <div
-        style={{
-          overflowX: "auto",
-          background: "#ffffff",
-          border: "1px solid #d9e2ec",
-          borderRadius: "14px",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="task-table-wrapper">
+        <table className="task-table">
           <thead>
             <tr style={{ background: "#f8fafc" }}>
               {[
@@ -858,6 +878,15 @@ function Tasks() {
               ].map((heading) => (
                 <th
                   key={heading}
+                  className={
+                    heading === "Description"
+                      ? "task-description-cell"
+                      : heading === "Service Provider"
+                      ? "task-provider-cell"
+                      : heading === "Actions"
+                      ? "task-actions-cell"
+                      : undefined
+                  }
                   style={{
                     padding: "14px",
                     textAlign: "left",
@@ -874,7 +903,15 @@ function Tasks() {
               filteredTasks.map((task) => (
                 <tr key={task._id}>
                   <td style={cellStyle}>{task.title}</td>
-                  <td style={cellStyle}>{task.description || "-"}</td>
+                  <td
+                    style={cellStyle}
+                    className="task-description-cell"
+                    title={task.description || "-"}
+                  >
+                    <span className="task-description-text">
+                      {task.description || "-"}
+                    </span>
+                  </td>
                   <td style={cellStyle}>
                     {task.deadline
                       ? new Date(task.deadline).toLocaleDateString()
@@ -883,24 +920,25 @@ function Tasks() {
                   <td style={cellStyle}>{task.priority}</td>
                   <td style={cellStyle}>{task.status}</td>
                   {!isServiceProvider ? (
-                    <td style={cellStyle}>
-                      {task.serviceProvider?.companyName || "-"}
+                    <td
+                      style={cellStyle}
+                      className="task-provider-cell"
+                      title={task.serviceProvider?.companyName || "-"}
+                    >
+                      <span className="task-provider-text">
+                        {task.serviceProvider?.companyName || "-"}
+                      </span>
                     </td>
                   ) : null}
                   {showActionsColumn ? (
-                    <td style={cellStyle}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "8px",
-                          flexWrap: "wrap",
-                        }}
-                      >
+                    <td style={cellStyle} className="task-actions-cell">
+                      <div className="task-action-row">
                         {isAdmin || canServiceProviderUpdateTask(task) ? (
                           <button
                             type="button"
                             onClick={() => handleEdit(task)}
                             style={actionButtonStyle}
+                            className="task-action-button"
                           >
                             {isServiceProvider ? "Update Status" : "Edit"}
                           </button>
@@ -915,6 +953,7 @@ function Tasks() {
                               color: "#ffffff",
                               borderColor: "#c1121f",
                             }}
+                            className="task-action-button task-action-button-delete"
                           >
                             Delete
                           </button>
@@ -934,9 +973,13 @@ function Tasks() {
                     color: "#6b7a90",
                   }}
                 >
-                  {isServiceProvider
+                  {visibleTasks.length === 0
+                    ? isServiceProvider
+                      ? "No tasks have been assigned to your provider account yet."
+                      : "No tasks have been created yet."
+                    : isServiceProvider
                     ? "No assigned tasks match the current filters."
-                    : "No tasks match the current filters."}
+                    : "No tasks match your current filters."}
                 </td>
               </tr>
             )}

@@ -12,6 +12,14 @@ const initialFormData = {
   notes: "",
 };
 
+const initialPaymentFilters = {
+  searchTerm: "",
+  paymentMethodFilter: "",
+  statusFilter: "",
+  minAmountFilter: "",
+  maxAmountFilter: "",
+};
+
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -65,6 +73,14 @@ function Payments() {
       contract: contracts[0]?._id || "",
     });
     setEditingPaymentId("");
+  };
+
+  const clearFilters = () => {
+    setSearchTerm(initialPaymentFilters.searchTerm);
+    setPaymentMethodFilter(initialPaymentFilters.paymentMethodFilter);
+    setStatusFilter(initialPaymentFilters.statusFilter);
+    setMinAmountFilter(initialPaymentFilters.minAmountFilter);
+    setMaxAmountFilter(initialPaymentFilters.maxAmountFilter);
   };
 
   const fetchPageData = async () => {
@@ -181,6 +197,13 @@ function Payments() {
       matchesMaxAmount
     );
   });
+
+  const hasActiveFilters =
+    searchTerm.trim() !== initialPaymentFilters.searchTerm ||
+    paymentMethodFilter !== initialPaymentFilters.paymentMethodFilter ||
+    statusFilter !== initialPaymentFilters.statusFilter ||
+    minAmountFilter !== initialPaymentFilters.minAmountFilter ||
+    maxAmountFilter !== initialPaymentFilters.maxAmountFilter;
 
   const normalizedUserEmail = user?.email?.trim().toLowerCase();
 
@@ -488,11 +511,21 @@ function Payments() {
             />
           </div>
         </div>
-      </div>
 
-      <p style={{ marginBottom: "16px", color: "#6b7a90", fontWeight: "600" }}>
-        Showing {filteredPayments.length} of {payments.length} payments
-      </p>
+        <div className="filter-toolbar-actions">
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="clear-filters-button"
+            disabled={!hasActiveFilters}
+          >
+            Clear Filters
+          </button>
+          <span className="filter-results-count">
+            Showing {filteredPayments.length} of {payments.length} payments
+          </span>
+        </div>
+      </div>
 
       {isAdmin ? (
         <form
@@ -779,7 +812,9 @@ function Payments() {
                     color: "#6b7a90",
                   }}
                 >
-                  No payments match the current filters.
+                  {payments.length === 0
+                    ? "No payments have been recorded yet."
+                    : "No payments match your current filters."}
                 </td>
               </tr>
             )}
