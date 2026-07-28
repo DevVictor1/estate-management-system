@@ -212,6 +212,12 @@ function Login() {
         </form>
 
         <p style={{ marginTop: "18px", textAlign: "center", color: "#6b7a90" }}>
+          <Link to="/forgot-password" style={{ color: "#0b1f3a", fontWeight: "600" }}>
+            Forgot password?
+          </Link>
+        </p>
+
+        <p style={{ marginTop: "12px", textAlign: "center", color: "#6b7a90" }}>
           Do not have an account?{" "}
           <Link to="/register" style={{ color: "#0b1f3a", fontWeight: "600" }}>
             Register

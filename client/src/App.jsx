@@ -9,9 +9,11 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Complaints from "./pages/Complaints";
 import Contracts from "./pages/Contracts";
 import Dashboard from "./pages/Dashboard";
+import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import Payments from "./pages/Payments";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import ServiceProviders from "./pages/ServiceProviders";
 import Tasks from "./pages/Tasks";
 import VerifyEmail from "./pages/VerifyEmail";
@@ -23,6 +25,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
 
         <Route element={<ProtectedRoute />}>

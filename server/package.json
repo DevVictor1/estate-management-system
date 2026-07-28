@@ -7,7 +7,8 @@
     "start": "node server.js",
     "email:test": "node scripts/sendTestEmail.js",
     "admin:recover-email": "node scripts/recoverAdminEmail.js",
-    "admin:inspect": "node scripts/inspectAdminAccount.js"
+    "admin:inspect": "node scripts/inspectAdminAccount.js",
+    "analytics:inspect": "node scripts/inspectAnalyticsData.js"
   },
   "keywords": [],
   "author": "",
@@ -15,12 +16,15 @@
   "description": "",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^2.10.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.0",
-    "resend": "^6.18.0"
+    "multer": "^2.2.0",
+    "resend": "^6.18.0",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

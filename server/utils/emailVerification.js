@@ -20,6 +20,19 @@ const getEmailVerificationExpiresMinutes = () => {
   return 60;
 };
 
+const getPasswordResetExpiresMinutes = () => {
+  const parsedValue = Number.parseInt(
+    process.env.PASSWORD_RESET_EXPIRES_MINUTES,
+    10
+  );
+
+  if (Number.isFinite(parsedValue) && parsedValue > 0) {
+    return parsedValue;
+  }
+
+  return 30;
+};
+
 const generateEmailVerificationToken = () => {
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -49,12 +62,45 @@ const getEmailVerificationUrl = (rawToken) => {
   )}`;
 };
 
+const generatePasswordResetToken = () => {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expiresInMinutes = getPasswordResetExpiresMinutes();
+  const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000);
+
+  return {
+    rawToken,
+    tokenHash,
+    expiresAt,
+    expiresInMinutes,
+  };
+};
+
+const hashPasswordResetToken = (token = "") =>
+  crypto.createHash("sha256").update(String(token || "")).digest("hex");
+
+const getPasswordResetUrl = (rawToken) => {
+  const clientUrl = String(process.env.CLIENT_URL || "").trim();
+
+  if (!rawToken || !/^https?:\/\//i.test(clientUrl)) {
+    return "";
+  }
+
+  return `${clientUrl.replace(/\/+$/, "")}/reset-password?token=${encodeURIComponent(
+    rawToken
+  )}`;
+};
+
 module.exports = {
   isValidEmail,
   normalizeEmail,
   isEmailVerified,
   getEmailVerificationExpiresMinutes,
+  getPasswordResetExpiresMinutes,
   generateEmailVerificationToken,
   hashEmailVerificationToken,
   getEmailVerificationUrl,
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  getPasswordResetUrl,
 };

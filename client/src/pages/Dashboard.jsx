@@ -1,5 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import {
   FaArrowRight,
   FaClipboardList,
@@ -13,6 +28,8 @@ import {
   FaTriangleExclamation,
   FaUsersGear,
 } from "react-icons/fa6";
+import ChartCard from "../components/dashboard/ChartCard";
+import ChartTooltip from "../components/dashboard/ChartTooltip";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -40,10 +57,42 @@ const initialStats = {
   },
 };
 
+const initialAnalytics = {
+  role: "",
+  charts: {
+    complaintsByStatus: [],
+    complaintsTrend: [],
+    tasksByStatus: [],
+    paymentsTrend: [],
+    completedTasksTrend: [],
+  },
+};
+
+const statusColorMap = {
+  open: "#f59e0b",
+  pending: "#f59e0b",
+  assigned: "#2563eb",
+  in_progress: "#2563eb",
+  resolved: "#16a34a",
+  closed: "#166534",
+  completed: "#16a34a",
+  paid: "#16a34a",
+  overdue: "#dc2626",
+  failed: "#dc2626",
+  rejected: "#dc2626",
+  cancelled: "#dc2626",
+  approved: "#16a34a",
+  active: "#2563eb",
+  expired: "#6b7280",
+  terminated: "#dc2626",
+  pending_renewal: "#8b5cf6",
+  default: "#64748b",
+};
+
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
-  maximumFractionDigits: 2,
+  maximumFractionDigits: 0,
 });
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -60,9 +109,13 @@ function Dashboard() {
   const [stats, setStats] = useState(initialStats);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [analytics, setAnalytics] = useState(initialAnalytics);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
   const [residentComplaints, setResidentComplaints] = useState([]);
   const [approvedProviders, setApprovedProviders] = useState([]);
-  const [residentComplaintsLoading, setResidentComplaintsLoading] = useState(false);
+  const [residentComplaintsLoading, setResidentComplaintsLoading] =
+    useState(false);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [residentComplaintsError, setResidentComplaintsError] = useState("");
   const [providersError, setProvidersError] = useState("");
@@ -84,6 +137,34 @@ function Dashboard() {
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
+
+  const fetchDashboardAnalytics = useCallback(async () => {
+    if (!user?.role) {
+      setAnalytics(initialAnalytics);
+      setAnalyticsLoading(false);
+      setAnalyticsError("");
+      return;
+    }
+
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+
+    try {
+      const response = await api.get("/api/dashboard/analytics");
+      setAnalytics(response.data.data || initialAnalytics);
+    } catch (err) {
+      setAnalyticsError(
+        err.response?.data?.message ||
+          "We couldn't load dashboard charts right now."
+      );
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    fetchDashboardAnalytics();
+  }, [fetchDashboardAnalytics]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -268,9 +349,6 @@ function Dashboard() {
     const pendingProviderApprovals = adminProviders.filter(
       (provider) => provider.verificationStatus === "pending"
     );
-    const openComplaints = adminComplaints.filter(
-      (complaint) => complaint.status === "open"
-    );
     const assignedComplaints = adminComplaints.filter(
       (complaint) => complaint.status === "assigned"
     );
@@ -284,11 +362,8 @@ function Dashboard() {
     const overdueTasks = adminTasks
       .filter((task) => task.status === "overdue")
       .sort(sortByDateAsc("deadline"));
-    const activeTasks = adminTasks.filter(
-      (task) =>
-        task.status === "pending" ||
-        task.status === "in_progress" ||
-        task.status === "overdue"
+    const activeTasks = adminTasks.filter((task) =>
+      ["pending", "in_progress", "overdue"].includes(task.status)
     );
     const expiringContracts = adminContracts
       .filter((contract) => {
@@ -324,7 +399,6 @@ function Dashboard() {
 
     return {
       pendingProviderApprovals,
-      openComplaints,
       assignedComplaints,
       activeTasks,
       overdueTasks,
@@ -398,37 +472,90 @@ function Dashboard() {
     [adminOverview, stats]
   );
 
+  const charts = analytics?.charts || initialAnalytics.charts;
+  const totalPaidAmount = currencyFormatter.format(stats.payments.totalPaid || 0);
+
+  const adminAttentionItems = [
+    ...adminOverview.pendingProviderApprovals.slice(0, 2).map((provider) => ({
+      key: `provider-${provider._id}`,
+      title: provider.companyName || "Pending service provider",
+      subtitle: "Verification approval pending",
+      meta: provider.serviceCategory
+        ? formatDisplayLabel(provider.serviceCategory)
+        : "Review provider details",
+      tone: "warning",
+      route: "/service-providers",
+      actionLabel: "Review Provider",
+    })),
+    ...adminOverview.highPriorityOpenComplaints
+      .slice(0, 2)
+      .map((complaint) => ({
+        key: `complaint-${complaint._id}`,
+        title: complaint.title || "Urgent complaint",
+        subtitle: "High-priority complaint needs triage",
+        meta: `${formatDisplayLabel(complaint.priority)} priority`,
+        tone: "danger",
+        route: "/complaints",
+        actionLabel: "Review Complaint",
+      })),
+    ...adminOverview.overdueTasks.slice(0, 2).map((task) => ({
+      key: `task-${task._id}`,
+      title: task.title || "Overdue task",
+      subtitle: task.serviceProvider?.companyName || "Assigned task",
+      meta: task.deadline
+        ? `Due ${dateFormatter.format(new Date(task.deadline))}`
+        : "Deadline not provided",
+      tone: "danger",
+      route: "/tasks",
+      actionLabel: "Open Tasks",
+    })),
+    ...adminOverview.expiringContracts.slice(0, 2).map((contract) => ({
+      key: `contract-${contract._id}`,
+      title: contract.contractTitle || "Expiring contract",
+      subtitle: contract.serviceProvider?.companyName || "Contract review due",
+      meta: contract.endDate
+        ? `Ends ${dateFormatter.format(new Date(contract.endDate))}`
+        : "End date not available",
+      tone: "warning",
+      route: "/contracts",
+      actionLabel: "View Contracts",
+    })),
+    ...adminOverview.pendingPayments.slice(0, 2).map((payment) => ({
+      key: `payment-${payment._id}`,
+      title:
+        payment.serviceProvider?.companyName ||
+        payment.contract?.contractTitle ||
+        "Pending payment",
+      subtitle: "Payment record still pending",
+      meta: currencyFormatter.format(payment.amount || 0),
+      tone: "warning",
+      route: "/payments",
+      actionLabel: "Open Payments",
+    })),
+  ].slice(0, 5);
+
   if (loading) {
     return <p>Loading dashboard stats...</p>;
   }
 
   if (isResident) {
     const firstName = user?.fullName?.trim()?.split(/\s+/)?.[0] || "Resident";
-    const sortedComplaints = [...residentComplaints].sort((firstComplaint, secondComplaint) => {
-      const firstCreatedAt = firstComplaint.createdAt
-        ? new Date(firstComplaint.createdAt).getTime()
-        : 0;
-      const secondCreatedAt = secondComplaint.createdAt
-        ? new Date(secondComplaint.createdAt).getTime()
-        : 0;
-
-      return secondCreatedAt - firstCreatedAt;
-    });
+    const sortedComplaints = [...residentComplaints].sort(
+      sortByDateDesc("createdAt")
+    );
     const recentComplaints = sortedComplaints.slice(0, 5);
     const complaintStats = {
       total: residentComplaints.length,
       open: residentComplaints.filter((complaint) => complaint.status === "open")
         .length,
-      inProgress: residentComplaints.filter(
-        (complaint) =>
-          complaint.status === "assigned" ||
-          complaint.status === "in_progress"
+      inProgress: residentComplaints.filter((complaint) =>
+        ["assigned", "in_progress"].includes(complaint.status)
       ).length,
-      resolved: residentComplaints.filter(
-        (complaint) =>
-          complaint.status === "resolved" || complaint.status === "closed"
+      resolved: residentComplaints.filter((complaint) =>
+        ["resolved", "closed"].includes(complaint.status)
       ).length,
     };
+
     const residentStatCards = [
       {
         label: "My Complaints",
@@ -484,7 +611,10 @@ function Dashboard() {
           <div className="dashboard-section-header">
             <div>
               <h2>Overview</h2>
-              <p>A quick snapshot of your complaint activity and available service providers.</p>
+              <p>
+                A quick snapshot of your complaint activity and available service
+                providers.
+              </p>
             </div>
           </div>
 
@@ -512,6 +642,97 @@ function Dashboard() {
                 </article>
               );
             })}
+          </div>
+        </section>
+
+        <section className="dashboard-section-card dashboard-chart-section">
+          <div className="dashboard-section-header">
+            <div>
+              <h2>Complaint Insights</h2>
+              <p>
+                Track how your own complaints are distributed and how activity
+                has changed over the last six months.
+              </p>
+            </div>
+          </div>
+
+          <div className="dashboard-chart-grid resident-dashboard-chart-grid">
+            <ChartCard
+              title="My Complaints by Status"
+              description="Only your complaint records are included here."
+              loading={analyticsLoading}
+              error={analyticsError}
+              onRetry={fetchDashboardAnalytics}
+              empty={!hasPositiveValue(charts.complaintsByStatus, "value")}
+              emptyMessage="No complaint data yet"
+              summary={buildStatusSummary(charts.complaintsByStatus)}
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={charts.complaintsByStatus}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={68}
+                    outerRadius={102}
+                    paddingAngle={3}
+                  >
+                    {charts.complaintsByStatus.map((entry) => (
+                      <Cell
+                        key={entry.key}
+                        fill={getChartColor(entry.key)}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={
+                      <ChartTooltip
+                        valueFormatter={(value) => `${value} complaints`}
+                      />
+                    }
+                  />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+
+            <ChartCard
+              title="My Complaint Activity"
+              description="The last six calendar months, including this month."
+              loading={analyticsLoading}
+              error={analyticsError}
+              onRetry={fetchDashboardAnalytics}
+              empty={!hasPositiveValue(charts.complaintsTrend, "count")}
+              emptyMessage="No complaint activity yet"
+              summary={buildMonthlySummary(charts.complaintsTrend, "count", "complaints")}
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={charts.complaintsTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                  <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                  <YAxis
+                    allowDecimals={false}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <Tooltip
+                    content={
+                      <ChartTooltip
+                        valueFormatter={(value) => `${value} complaints`}
+                      />
+                    }
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke={getChartColor("assigned")}
+                    strokeWidth={3}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
           </div>
         </section>
 
@@ -603,12 +824,12 @@ function Dashboard() {
                       <span
                         className={`resident-status-badge resident-status-${complaint.status}`}
                       >
-                        {formatResidentComplaintStatus(complaint.status)}
+                        {formatDisplayLabel(complaint.status)}
                       </span>
                     </div>
                     <div className="resident-complaint-meta">
                       <span className="resident-complaint-priority">
-                        Priority: {formatResidentComplaintStatus(complaint.priority)}
+                        Priority: {formatDisplayLabel(complaint.priority)}
                       </span>
                     </div>
                   </article>
@@ -618,8 +839,8 @@ function Dashboard() {
               <div className="resident-empty-state">
                 <h3>No Complaints Yet</h3>
                 <p>
-                  You have not submitted any complaints. Use “Submit New
-                  Complaint” whenever you need assistance.
+                  You have not submitted any complaints. Use "Submit New
+                  Complaint" whenever you need assistance.
                 </p>
                 <Link to="/complaints" className="resident-primary-link">
                   Submit New Complaint
@@ -657,7 +878,7 @@ function Dashboard() {
                       <span className="resident-provider-badge">Approved</span>
                     </div>
                     <p className="resident-provider-category">
-                      {formatResidentComplaintStatus(provider.serviceCategory)}
+                      {formatDisplayLabel(provider.serviceCategory)}
                     </p>
                     <p className="resident-provider-phone">
                       {provider.phone || "Phone not available"}
@@ -677,8 +898,12 @@ function Dashboard() {
   }
 
   if (isServiceProvider) {
+    const providerTaskStatusData = charts.tasksByStatus || [];
+    const completedTaskTrend = charts.completedTasksTrend || [];
+    const providerPaymentsTrend = charts.paymentsTrend || [];
+
     return (
-      <section className="dashboard-page">
+      <section className="dashboard-page service-provider-dashboard">
         <div className="dashboard-hero">
           <div>
             <p className="dashboard-eyebrow">Service Provider Dashboard</p>
@@ -714,75 +939,149 @@ function Dashboard() {
               </article>
             </div>
           </section>
+
+          <section className="dashboard-section-card dashboard-chart-section">
+            <div className="dashboard-section-header">
+              <div>
+                <h2>Performance Overview</h2>
+                <p>
+                  These charts summarize only the tasks and payments linked to
+                  your provider account.
+                </p>
+              </div>
+            </div>
+
+            <div className="dashboard-chart-grid provider-dashboard-chart-grid">
+              <ChartCard
+                title="My Tasks by Status"
+                description="Only tasks assigned to your company are counted."
+                loading={analyticsLoading}
+                error={analyticsError}
+                onRetry={fetchDashboardAnalytics}
+                empty={!hasPositiveValue(providerTaskStatusData, "value")}
+                emptyMessage="No task activity yet"
+                summary={buildStatusSummary(providerTaskStatusData)}
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={providerTaskStatusData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                    <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                    <YAxis
+                      allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          valueFormatter={(value) => `${value} tasks`}
+                        />
+                      }
+                    />
+                    <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                      {providerTaskStatusData.map((entry) => (
+                        <Cell
+                          key={entry.key}
+                          fill={getChartColor(entry.key)}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard
+                title="Completed Tasks Trend"
+                description="Completed work over the last six calendar months."
+                loading={analyticsLoading}
+                error={analyticsError}
+                onRetry={fetchDashboardAnalytics}
+                empty={!hasPositiveValue(completedTaskTrend, "count")}
+                emptyMessage="No completed task activity yet"
+                summary={buildMonthlySummary(
+                  completedTaskTrend,
+                  "count",
+                  "completed tasks"
+                )}
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={completedTaskTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis
+                      allowDecimals={false}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          valueFormatter={(value) =>
+                            `${value} completed tasks`
+                          }
+                        />
+                      }
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke={getChartColor("completed")}
+                      strokeWidth={3}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+
+              <ChartCard
+                title="My Payments Trend"
+                description="Paid payment records linked to your contracts."
+                loading={analyticsLoading}
+                error={analyticsError}
+                onRetry={fetchDashboardAnalytics}
+                empty={!hasPositiveValue(providerPaymentsTrend, "amount")}
+                emptyMessage="No payment activity yet"
+                summary={buildMonthlySummary(
+                  providerPaymentsTrend,
+                  "amount",
+                  "paid value",
+                  formatCurrencyValue
+                )}
+                wide
+              >
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={providerPaymentsTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                    <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                    <YAxis
+                      tickFormatter={formatCompactNaira}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          valueFormatter={(value) => formatCurrencyValue(value)}
+                        />
+                      }
+                    />
+                    <Bar
+                      dataKey="amount"
+                      radius={[10, 10, 0, 0]}
+                      fill={getChartColor("paid")}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          </section>
         </div>
       </section>
     );
   }
 
   const firstName = user?.fullName?.trim()?.split(/\s+/)?.[0] || "Admin";
-  const totalPaidAmount = currencyFormatter.format(stats.payments.totalPaid || 0);
-  const adminAttentionItems = [
-    ...adminOverview.pendingProviderApprovals
-      .slice(0, 2)
-      .map((provider) => ({
-        key: `provider-${provider._id}`,
-        title: provider.companyName || "Pending service provider",
-        subtitle: "Verification approval pending",
-        meta: provider.serviceCategory
-          ? formatResidentComplaintStatus(provider.serviceCategory)
-          : "Review provider details",
-        tone: "warning",
-        route: "/service-providers",
-        actionLabel: "Review Provider",
-      })),
-    ...adminOverview.highPriorityOpenComplaints
-      .slice(0, 2)
-      .map((complaint) => ({
-        key: `complaint-${complaint._id}`,
-        title: complaint.title || "Urgent complaint",
-        subtitle: "High-priority complaint needs triage",
-        meta: `${
-          formatResidentComplaintStatus(complaint.priority)
-        } priority`,
-        tone: "danger",
-        route: "/complaints",
-        actionLabel: "Review Complaint",
-      })),
-    ...adminOverview.overdueTasks.slice(0, 2).map((task) => ({
-      key: `task-${task._id}`,
-      title: task.title || "Overdue task",
-      subtitle: task.serviceProvider?.companyName || "Assigned task",
-      meta: task.deadline
-        ? `Due ${dateFormatter.format(new Date(task.deadline))}`
-        : "Deadline not provided",
-      tone: "danger",
-      route: "/tasks",
-      actionLabel: "Open Tasks",
-    })),
-    ...adminOverview.expiringContracts.slice(0, 2).map((contract) => ({
-      key: `contract-${contract._id}`,
-      title: contract.contractTitle || "Expiring contract",
-      subtitle: contract.serviceProvider?.companyName || "Contract review due",
-      meta: contract.endDate
-        ? `Ends ${dateFormatter.format(new Date(contract.endDate))}`
-        : "End date not available",
-      tone: "warning",
-      route: "/contracts",
-      actionLabel: "View Contracts",
-    })),
-    ...adminOverview.pendingPayments.slice(0, 2).map((payment) => ({
-      key: `payment-${payment._id}`,
-      title:
-        payment.serviceProvider?.companyName ||
-        payment.contract?.contractTitle ||
-        "Pending payment",
-      subtitle: "Payment record still pending",
-      meta: currencyFormatter.format(payment.amount || 0),
-      tone: "warning",
-      route: "/payments",
-      actionLabel: "Open Payments",
-    })),
-  ].slice(0, 5);
 
   return (
     <section className="dashboard-page admin-dashboard">
@@ -791,7 +1090,7 @@ function Dashboard() {
           <p className="dashboard-eyebrow">Operations Overview</p>
           <h1>Welcome back, {firstName}</h1>
           <p className="dashboard-subtitle">
-            Here’s what is happening across the estate today.
+            Here's what is happening across the estate today.
           </p>
         </div>
       </div>
@@ -834,6 +1133,159 @@ function Dashboard() {
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="dashboard-section-card dashboard-chart-section">
+        <div className="dashboard-section-header">
+          <div>
+            <h2>Operations Trends</h2>
+            <p>
+              Estate-wide status distribution and six-month activity patterns
+              across complaints, tasks, and payments.
+            </p>
+          </div>
+        </div>
+
+        <div className="dashboard-chart-grid admin-dashboard-chart-grid">
+          <ChartCard
+            title="Complaints by Status"
+            description="Current complaint distribution across valid workflow states."
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={fetchDashboardAnalytics}
+            empty={!hasPositiveValue(charts.complaintsByStatus, "value")}
+            emptyMessage="No complaint data yet"
+            summary={buildStatusSummary(charts.complaintsByStatus)}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={charts.complaintsByStatus}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={68}
+                  outerRadius={102}
+                  paddingAngle={3}
+                >
+                  {charts.complaintsByStatus.map((entry) => (
+                    <Cell key={entry.key} fill={getChartColor(entry.key)} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      valueFormatter={(value) => `${value} complaints`}
+                    />
+                  }
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard
+            title="Complaints Created Over Time"
+            description="The most recent six calendar months, including this month."
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={fetchDashboardAnalytics}
+            empty={!hasPositiveValue(charts.complaintsTrend, "count")}
+            emptyMessage="No complaint data yet"
+            summary={buildMonthlySummary(charts.complaintsTrend, "count", "complaints")}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={charts.complaintsTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      valueFormatter={(value) => `${value} complaints`}
+                    />
+                  }
+                />
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke={getChartColor("assigned")}
+                  strokeWidth={3}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard
+            title="Tasks by Status"
+            description="Operational task load across all current task states."
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={fetchDashboardAnalytics}
+            empty={!hasPositiveValue(charts.tasksByStatus, "value")}
+            emptyMessage="No task data yet"
+            summary={buildStatusSummary(charts.tasksByStatus)}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={charts.tasksByStatus}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                <Tooltip
+                  content={
+                    <ChartTooltip valueFormatter={(value) => `${value} tasks`} />
+                  }
+                />
+                <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                  {charts.tasksByStatus.map((entry) => (
+                    <Cell key={entry.key} fill={getChartColor(entry.key)} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+
+          <ChartCard
+            title="Payment Activity"
+            description="Paid payment amounts recorded over the last six months."
+            loading={analyticsLoading}
+            error={analyticsError}
+            onRetry={fetchDashboardAnalytics}
+            empty={!hasPositiveValue(charts.paymentsTrend, "amount")}
+            emptyMessage="No payment activity yet"
+            summary={buildMonthlySummary(
+              charts.paymentsTrend,
+              "amount",
+              "paid value",
+              formatCurrencyValue
+            )}
+          >
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={charts.paymentsTrend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#d9e2ec" />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                <YAxis
+                  tickFormatter={formatCompactNaira}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <Tooltip
+                  content={
+                    <ChartTooltip
+                      valueFormatter={(value) => formatCurrencyValue(value)}
+                    />
+                  }
+                />
+                <Bar
+                  dataKey="amount"
+                  radius={[10, 10, 0, 0]}
+                  fill={getChartColor("paid")}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
         </div>
       </section>
 
@@ -958,7 +1410,9 @@ function Dashboard() {
                       <h3>{item.title}</h3>
                       <p>{item.subtitle}</p>
                     </div>
-                    <span className={`admin-status-badge admin-status-badge-${item.tone}`}>
+                    <span
+                      className={`admin-status-badge admin-status-badge-${item.tone}`}
+                    >
                       {item.meta}
                     </span>
                   </div>
@@ -1013,7 +1467,9 @@ function Dashboard() {
                 <article key={payment._id} className="admin-preview-item">
                   <div className="admin-preview-main">
                     <div>
-                      <h3>{payment.serviceProvider?.companyName || "Pending payment"}</h3>
+                      <h3>
+                        {payment.serviceProvider?.companyName || "Pending payment"}
+                      </h3>
                       <p>
                         {payment.paymentDate
                           ? `Recorded ${dateFormatter.format(
@@ -1065,7 +1521,7 @@ function Dashboard() {
                       <p>
                         {complaint.resident?.fullName || "Resident not available"}
                         {" • "}
-                        {formatResidentComplaintStatus(complaint.category)}
+                        {formatDisplayLabel(complaint.category)}
                       </p>
                     </div>
                     <span
@@ -1073,11 +1529,13 @@ function Dashboard() {
                         complaint.status
                       )}`}
                     >
-                      {formatResidentComplaintStatus(complaint.status)}
+                      {formatDisplayLabel(complaint.status)}
                     </span>
                   </div>
                   <div className="admin-preview-meta">
-                    <span>Priority: {formatResidentComplaintStatus(complaint.priority)}</span>
+                    <span>
+                      Priority: {formatDisplayLabel(complaint.priority)}
+                    </span>
                     <span>
                       Provider: {complaint.serviceProvider?.companyName || "-"}
                     </span>
@@ -1122,7 +1580,10 @@ function Dashboard() {
                   <div className="admin-preview-main">
                     <div>
                       <h3>{task.title}</h3>
-                      <p>{task.serviceProvider?.companyName || "Service provider not assigned"}</p>
+                      <p>
+                        {task.serviceProvider?.companyName ||
+                          "Service provider not assigned"}
+                      </p>
                     </div>
                     <span
                       className={`admin-status-badge admin-status-badge-${getTaskTone(
@@ -1131,7 +1592,7 @@ function Dashboard() {
                     >
                       {task.status === "overdue"
                         ? "Overdue"
-                        : formatResidentComplaintStatus(task.status)}
+                        : formatDisplayLabel(task.status)}
                     </span>
                   </div>
                   <div className="admin-preview-meta">
@@ -1142,9 +1603,9 @@ function Dashboard() {
                         : "-"}
                     </span>
                     <span>
-                      Priority: {formatResidentComplaintStatus(task.priority)}
+                      Priority: {formatDisplayLabel(task.priority)}
                     </span>
-                    <span>Status: {formatResidentComplaintStatus(task.status)}</span>
+                    <span>Status: {formatDisplayLabel(task.status)}</span>
                   </div>
                 </article>
               ))}
@@ -1160,12 +1621,12 @@ function Dashboard() {
   );
 }
 
-function formatResidentComplaintStatus(value) {
+function formatDisplayLabel(value) {
   if (!value) {
     return "-";
   }
 
-  return value
+  return String(value)
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
@@ -1233,6 +1694,63 @@ function hasAnySectionLoading(values) {
 
 function hasAnySectionError(values) {
   return values.some(Boolean);
+}
+
+function hasPositiveValue(data = [], key) {
+  return Array.isArray(data) && data.some((item) => Number(item[key]) > 0);
+}
+
+function getChartColor(key) {
+  return statusColorMap[key] || statusColorMap.default;
+}
+
+function formatCurrencyValue(value) {
+  return currencyFormatter.format(Number(value) || 0);
+}
+
+function formatCompactNaira(value) {
+  const amount = Number(value) || 0;
+
+  if (amount >= 1000000) {
+    return `₦${(amount / 1000000).toFixed(amount >= 10000000 ? 0 : 1)}M`;
+  }
+
+  if (amount >= 1000) {
+    return `₦${(amount / 1000).toFixed(amount >= 100000 ? 0 : 1)}K`;
+  }
+
+  return `₦${amount}`;
+}
+
+function buildStatusSummary(data = []) {
+  if (!data.length) {
+    return "";
+  }
+
+  return data
+    .slice(0, 3)
+    .map((item) => `${item.name}: ${item.value}`)
+    .join(" • ");
+}
+
+function buildMonthlySummary(data = [], valueKey, noun, formatter) {
+  if (!data.length) {
+    return "";
+  }
+
+  const latest = [...data]
+    .reverse()
+    .find((item) => Number(item[valueKey]) > 0);
+
+  if (!latest) {
+    return "";
+  }
+
+  const formattedValue = formatter
+    ? formatter(latest[valueKey])
+    : `${latest[valueKey]}`;
+
+  return `${latest.month}: ${formattedValue} ${noun}`.trim();
 }
 
 export default Dashboard;

@@ -7,10 +7,30 @@ const { sendEmail } = require("../services/emailService");
 const {
   buildComplaintSubmittedEmail,
 } = require("../emailTemplates/complaintSubmitted");
-const { isEmailVerified } = require("../utils/emailVerification");
+const {
+  deleteComplaintAttachments,
+  extractComplaintUploadFiles,
+  uploadComplaintAttachments,
+} = require("../utils/complaintAttachments");
 
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const serializeComplaint = (complaint) => {
+  if (!complaint) {
+    return complaint;
+  }
+
+  const complaintObject =
+    typeof complaint.toObject === "function" ? complaint.toObject() : complaint;
+
+  return {
+    ...complaintObject,
+    attachments: Array.isArray(complaintObject.attachments)
+      ? complaintObject.attachments.map(({ publicId, ...attachment }) => attachment)
+      : [],
+  };
+};
 
 const getComplaintNotificationRecipients = async () => {
   const { emailAdminRecipient } = getEmailConfig();
@@ -78,8 +98,16 @@ const getComplaintsReviewUrl = () => {
 };
 
 const createComplaint = async (req, res) => {
+  let uploadedAttachments = [];
+
   try {
     const isResidentComplaint = req.user?.role === "resident";
+    const uploadedFiles = extractComplaintUploadFiles(req.files);
+
+    if (uploadedFiles.length) {
+      uploadedAttachments = await uploadComplaintAttachments(uploadedFiles);
+    }
+
     const complaintData =
       isResidentComplaint
         ? {
@@ -89,8 +117,12 @@ const createComplaint = async (req, res) => {
             priority: req.body.priority,
             resident: req.user._id,
             status: "open",
+            attachments: uploadedAttachments,
           }
-        : { ...req.body };
+        : {
+            ...req.body,
+            attachments: uploadedAttachments,
+          };
 
     const complaint = await Complaint.create(complaintData);
 
@@ -137,13 +169,21 @@ const createComplaint = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Complaint created successfully",
-      data: complaint,
+      data: serializeComplaint(complaint),
     });
   } catch (error) {
-    res.status(500).json({
+    if (uploadedAttachments.length) {
+      await deleteComplaintAttachments(uploadedAttachments);
+    }
+
+    const statusCode = error.statusCode || 500;
+
+    res.status(statusCode).json({
       success: false,
-      message: "Failed to create complaint",
-      error: error.message,
+      message:
+        statusCode >= 500
+          ? error.message || "Failed to create complaint"
+          : error.message || "Failed to create complaint",
     });
   }
 };
@@ -163,7 +203,7 @@ const getComplaints = async (req, res) => {
     res.status(200).json({
       success: true,
       count: complaints.length,
-      data: complaints,
+      data: complaints.map(serializeComplaint),
     });
   } catch (error) {
     res.status(500).json({
@@ -194,7 +234,7 @@ const getComplaintById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: complaint,
+      data: serializeComplaint(complaint),
     });
   } catch (error) {
     res.status(500).json({
@@ -273,7 +313,7 @@ const updateComplaint = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Complaint updated successfully",
-      data: complaint,
+      data: serializeComplaint(complaint),
     });
   } catch (error) {
     res.status(500).json({
@@ -286,13 +326,25 @@ const updateComplaint = async (req, res) => {
 
 const deleteComplaint = async (req, res) => {
   try {
-    const complaint = await Complaint.findByIdAndDelete(req.params.id);
+    const complaint = await Complaint.findById(req.params.id).select(
+      "+attachments.publicId"
+    );
 
     if (!complaint) {
       return res.status(404).json({
         success: false,
         message: "Complaint not found",
       });
+    }
+
+    await Complaint.deleteOne({ _id: complaint._id });
+
+    try {
+      await deleteComplaintAttachments(complaint.attachments);
+    } catch (cleanupError) {
+      console.warn(
+        "Complaint deleted, but one or more complaint photos could not be removed from cloud storage."
+      );
     }
 
     res.status(200).json({

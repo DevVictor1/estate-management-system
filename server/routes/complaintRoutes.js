@@ -1,5 +1,6 @@
 const express = require("express");
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
+const { complaintUpload } = require("../middleware/complaintUpload");
 
 const {
   createComplaint,
@@ -11,7 +12,13 @@ const {
 
 const router = express.Router();
 
-router.post("/", protect, authorizeRoles("admin", "resident"), createComplaint);
+router.post(
+  "/",
+  protect,
+  authorizeRoles("admin", "resident"),
+  complaintUpload,
+  createComplaint
+);
 router.get("/", protect, authorizeRoles("admin", "resident"), getComplaints);
 router.get("/:id", protect, authorizeRoles("admin", "resident"), getComplaintById);
 router.put("/:id", protect, authorizeRoles("admin"), updateComplaint);

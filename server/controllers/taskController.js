@@ -17,6 +17,46 @@ const creatableStatuses = ["pending", "in_progress", "overdue", "cancelled"];
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+const getNormalizedEmail = (value = "") => String(value || "").trim().toLowerCase();
+
+const buildProviderTaskQuery = async (user) => {
+  const providerEmail = getNormalizedEmail(user?.email);
+
+  if (!providerEmail) {
+    return { _id: null };
+  }
+
+  const providerRecords = await ServiceProvider.find({
+    email: providerEmail,
+  }).select("_id");
+
+  if (!providerRecords.length) {
+    return { _id: null };
+  }
+
+  return {
+    serviceProvider: {
+      $in: providerRecords.map((provider) => provider._id),
+    },
+  };
+};
+
+const getTaskQueryForUser = async (user) => {
+  if (user?.role === "admin") {
+    return {};
+  }
+
+  if (user?.role === "service_provider") {
+    return buildProviderTaskQuery(user);
+  }
+
+  return null;
+};
+
+const buildComplaintSelect = (fields = []) => [
+  ...new Set(fields.filter(Boolean)),
+].join(" ");
+
 const applyTaskPopulates = (query, userRole) => {
   query
     .populate("serviceProvider", "companyName serviceCategory phone email")
@@ -30,6 +70,11 @@ const applyTaskPopulates = (query, userRole) => {
         path: "resident",
         select: "fullName email apartmentNumber",
       },
+    });
+  } else if (userRole === "service_provider") {
+    query.populate({
+      path: "complaint",
+      select: buildComplaintSelect(["title", "attachments"]),
     });
   }
 
@@ -262,8 +307,17 @@ const createTask = async (req, res) => {
 
 const getTasks = async (req, res) => {
   try {
+    const taskQuery = await getTaskQueryForUser(req.user);
+
+    if (taskQuery === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access this resource.",
+      });
+    }
+
     const tasks = await applyTaskPopulates(
-      Task.find().sort({ createdAt: -1 }),
+      Task.find(taskQuery).sort({ createdAt: -1 }),
       req.user?.role
     );
 
@@ -283,8 +337,17 @@ const getTasks = async (req, res) => {
 
 const getTaskById = async (req, res) => {
   try {
+    const taskQuery = await getTaskQueryForUser(req.user);
+
+    if (taskQuery === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access this resource.",
+      });
+    }
+
     const task = await applyTaskPopulates(
-      Task.findById(req.params.id),
+      Task.findOne({ ...taskQuery, _id: req.params.id }),
       req.user?.role
     );
 

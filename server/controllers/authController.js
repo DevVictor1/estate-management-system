@@ -3,17 +3,23 @@ const ServiceProvider = require("../models/ServiceProvider");
 const User = require("../models/User");
 const { sendEmail } = require("../services/emailService");
 const { buildVerifyEmailTemplate } = require("../emailTemplates/verifyEmail");
+const { buildResetPasswordTemplate } = require("../emailTemplates/resetPassword");
 const {
   GENERIC_RESEND_RESPONSE,
 } = require("../middleware/resendVerificationRateLimit");
 const {
+  GENERIC_FORGOT_PASSWORD_RESPONSE,
+} = require("../middleware/forgotPasswordRateLimit");
+const {
   isValidEmail,
   normalizeEmail,
   isEmailVerified,
-  getEmailVerificationExpiresMinutes,
   generateEmailVerificationToken,
   hashEmailVerificationToken,
   getEmailVerificationUrl,
+  generatePasswordResetToken,
+  hashPasswordResetToken,
+  getPasswordResetUrl,
 } = require("../utils/emailVerification");
 
 const allowedServiceCategories = [
@@ -24,6 +30,11 @@ const allowedServiceCategories = [
   "maintenance",
   "other",
 ];
+
+const GENERIC_RESEND_MESSAGE = GENERIC_RESEND_RESPONSE.message;
+const GENERIC_FORGOT_PASSWORD_MESSAGE = GENERIC_FORGOT_PASSWORD_RESPONSE.message;
+const RESEND_COOLDOWN_MS = 60 * 1000;
+const FORGOT_PASSWORD_COOLDOWN_MS = 60 * 1000;
 
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
@@ -88,8 +99,47 @@ const sendVerificationEmailToUser = async (user) => {
   });
 };
 
-const GENERIC_RESEND_MESSAGE = GENERIC_RESEND_RESPONSE.message;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+const applyPasswordResetToken = (user) => {
+  const { rawToken, tokenHash, expiresAt, expiresInMinutes } =
+    generatePasswordResetToken();
+
+  user.passwordResetTokenHash = tokenHash;
+  user.passwordResetExpires = expiresAt;
+  user.passwordResetSentAt = new Date();
+
+  return {
+    rawToken,
+    expiresInMinutes,
+  };
+};
+
+const sendPasswordResetEmailToUser = async (user) => {
+  const resetData = applyPasswordResetToken(user);
+  await user.save();
+
+  const resetUrl = getPasswordResetUrl(resetData.rawToken);
+
+  if (!resetUrl || !isValidEmail(user.email)) {
+    return {
+      success: false,
+      error:
+        "Password reset email could not be sent because the reset link is unavailable.",
+    };
+  }
+
+  const template = buildResetPasswordTemplate({
+    userName: user.fullName,
+    resetUrl,
+    expiresInMinutes: resetData.expiresInMinutes,
+  });
+
+  return sendEmail({
+    to: user.email,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+  });
+};
 
 const registerUser = async (req, res) => {
   try {
@@ -114,9 +164,7 @@ const registerUser = async (req, res) => {
       });
     }
 
-    // Admin accounts must never be created through the public registration flow.
     const safeRole = role === "service_provider" ? "service_provider" : "resident";
-
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
@@ -143,7 +191,6 @@ const registerUser = async (req, res) => {
           ? serviceCategory
           : "other";
 
-        // Service provider accounts start in a pending state until an admin approves them.
         await ServiceProvider.create({
           companyName: fullName,
           contactPerson: fullName,
@@ -171,9 +218,7 @@ const registerUser = async (req, res) => {
     const emailResult = await sendVerificationEmailToUser(user);
 
     if (!emailResult.success) {
-      console.warn(
-        "User registered, but verification email could not be sent."
-      );
+      console.warn("User registered, but verification email could not be sent.");
     } else {
       verificationEmailSent = true;
     }
@@ -343,10 +388,105 @@ const resendVerification = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const normalizedEmail = normalizeEmail(req.body?.email);
+
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(200).json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+    }
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+passwordResetTokenHash +passwordResetExpires +passwordResetSentAt"
+    );
+
+    if (!user) {
+      return res.status(200).json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+    }
+
+    const lastSentAt = user.passwordResetSentAt
+      ? new Date(user.passwordResetSentAt).getTime()
+      : 0;
+
+    if (lastSentAt && Date.now() - lastSentAt < FORGOT_PASSWORD_COOLDOWN_MS) {
+      return res.status(200).json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+    }
+
+    const emailResult = await sendPasswordResetEmailToUser(user);
+
+    if (!emailResult.success) {
+      console.warn(
+        "Password reset was requested, but the reset email could not be sent."
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: GENERIC_FORGOT_PASSWORD_MESSAGE,
+    });
+  } catch (error) {
+    return res.status(200).json(GENERIC_FORGOT_PASSWORD_RESPONSE);
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body || {};
+
+    if (!token || !password || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token, password, and confirm password are required.",
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match.",
+      });
+    }
+
+    const hashedToken = hashPasswordResetToken(String(token).trim());
+    const user = await User.findOne({
+      passwordResetTokenHash: hashedToken,
+      passwordResetExpires: { $gt: new Date() },
+    }).select(
+      "+passwordResetTokenHash +passwordResetExpires +passwordResetSentAt +password"
+    );
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "This password reset link is invalid or has expired.",
+      });
+    }
+
+    user.password = password;
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpires = undefined;
+    user.passwordResetSentAt = undefined;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Your password has been reset successfully.",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reset password.",
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getMe,
   verifyEmail,
   resendVerification,
+  forgotPassword,
+  resetPassword,
 };

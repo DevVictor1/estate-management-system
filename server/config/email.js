@@ -13,6 +13,8 @@ const getEmailConfig = () => ({
   emailPaymentRecipient: process.env.EMAIL_PAYMENT_RECIPIENT || "",
   emailVerificationExpiresMinutes:
     process.env.EMAIL_VERIFICATION_EXPIRES_MINUTES || "",
+  passwordResetExpiresMinutes:
+    process.env.PASSWORD_RESET_EXPIRES_MINUTES || "",
 });
 
 const getResendClient = () => {

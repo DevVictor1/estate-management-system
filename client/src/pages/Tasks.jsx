@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { FaArrowLeft, FaClipboardCheck } from "react-icons/fa6";
+import {
+  FaArrowLeft,
+  FaChevronLeft,
+  FaChevronRight,
+  FaXmark,
+} from "react-icons/fa6";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -21,6 +26,21 @@ const initialTaskFilters = {
   statusFilter: "",
 };
 
+const formatFileSize = (sizeInBytes = 0) => {
+  if (!sizeInBytes) {
+    return "0 KB";
+  }
+
+  if (sizeInBytes >= 1024 * 1024) {
+    return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${Math.max(1, Math.round(sizeInBytes / 1024))} KB`;
+};
+
+const getTaskComplaintAttachments = (task) =>
+  Array.isArray(task?.complaint?.attachments) ? task.complaint.attachments : [];
+
 function Tasks() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -30,6 +50,11 @@ function Tasks() {
   const [formData, setFormData] = useState(initialFormData);
   const [editingTaskId, setEditingTaskId] = useState("");
   const [complaintContext, setComplaintContext] = useState(null);
+  const [complaintPhotoPreview, setComplaintPhotoPreview] = useState({
+    attachments: [],
+    index: 0,
+    title: "",
+  });
   const [loadingComplaint, setLoadingComplaint] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
@@ -81,6 +106,11 @@ function Tasks() {
 
   const clearComplaintPrefillState = ({ resetTaskForm = true } = {}) => {
     setComplaintContext(null);
+    setComplaintPhotoPreview({
+      attachments: [],
+      index: 0,
+      title: "",
+    });
     setLoadingComplaint(false);
 
     if (resetTaskForm) {
@@ -186,6 +216,55 @@ function Tasks() {
       isMounted = false;
     };
   }, [complaintPrefillRequestId, navigate]);
+
+  const activeComplaintPhoto = complaintPhotoPreview.attachments?.[
+    complaintPhotoPreview.index
+  ];
+
+  useEffect(() => {
+    if (!activeComplaintPhoto) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setComplaintPhotoPreview({
+          attachments: [],
+          index: 0,
+          title: "",
+        });
+        return;
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        complaintPhotoPreview.attachments.length > 1
+      ) {
+        setComplaintPhotoPreview((currentPreview) => ({
+          ...currentPreview,
+          index: (currentPreview.index + 1) % currentPreview.attachments.length,
+        }));
+      }
+
+      if (
+        event.key === "ArrowLeft" &&
+        complaintPhotoPreview.attachments.length > 1
+      ) {
+        setComplaintPhotoPreview((currentPreview) => ({
+          ...currentPreview,
+          index:
+            (currentPreview.index - 1 + currentPreview.attachments.length) %
+            currentPreview.attachments.length,
+        }));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeComplaintPhoto, complaintPhotoPreview.attachments.length]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -352,6 +431,44 @@ function Tasks() {
     clearComplaintPrefillState();
   };
 
+  const openComplaintPhotoPreview = (startingIndex = 0) => {
+    const attachments = Array.isArray(complaintContext?.attachments)
+      ? complaintContext.attachments
+      : [];
+
+    if (!attachments.length) {
+      return;
+    }
+
+    setComplaintPhotoPreview({
+      attachments,
+      index: startingIndex,
+      title: complaintContext?.title || "Complaint photo",
+    });
+  };
+
+  const openTaskComplaintPhotoPreview = (task, startingIndex = 0) => {
+    const attachments = getTaskComplaintAttachments(task);
+
+    if (!attachments.length) {
+      return;
+    }
+
+    setComplaintPhotoPreview({
+      attachments,
+      index: startingIndex,
+      title: task.complaint?.title || task.title || "Complaint photo",
+    });
+  };
+
+  const closeComplaintPhotoPreview = () => {
+    setComplaintPhotoPreview({
+      attachments: [],
+      index: 0,
+      title: "",
+    });
+  };
+
   const filteredTasks = visibleTasks.filter((task) => {
     const searchValue = searchTerm.trim().toLowerCase();
     const matchesSearch =
@@ -396,6 +513,9 @@ function Tasks() {
     complaintContext?.resident?.email?.trim() || "Not provided";
   const apartmentNumber =
     complaintContext?.resident?.apartmentNumber?.trim() || "Not provided";
+  const complaintAttachments = Array.isArray(complaintContext?.attachments)
+    ? complaintContext.attachments
+    : [];
 
   if (loading) {
     return <p>Loading tasks...</p>;
@@ -537,6 +657,35 @@ function Tasks() {
                 <strong>{apartmentNumber}</strong>
               </div>
             </div>
+
+            {complaintAttachments.length ? (
+              <div className="complaint-task-attachments">
+                <div className="complaint-task-attachments-header">
+                  <span className="complaint-task-context-label">
+                    Complaint Photos
+                  </span>
+                  <strong>
+                    {complaintAttachments.length}{" "}
+                    {complaintAttachments.length === 1 ? "photo" : "photos"}
+                  </strong>
+                </div>
+                <div className="complaint-task-attachment-grid">
+                  {complaintAttachments.map((attachment, index) => (
+                    <button
+                      key={`${complaintContext._id}-attachment-${index}`}
+                      type="button"
+                      className="complaint-task-attachment-button"
+                      onClick={() => openComplaintPhotoPreview(index)}
+                    >
+                      <img
+                        src={attachment.url}
+                        alt={`${complaintContext.title} photo ${index + 1}`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -911,6 +1060,46 @@ function Tasks() {
                     <span className="task-description-text">
                       {task.description || "-"}
                     </span>
+                    {isServiceProvider &&
+                    getTaskComplaintAttachments(task).length ? (
+                      <div className="task-complaint-attachments">
+                        <div className="task-complaint-attachment-row">
+                          {getTaskComplaintAttachments(task)
+                            .slice(0, 3)
+                            .map((attachment, index) => (
+                              <button
+                                key={`${task._id}-complaint-attachment-${index}`}
+                                type="button"
+                                className="task-complaint-attachment-thumb"
+                                onClick={() =>
+                                  openTaskComplaintPhotoPreview(task, index)
+                                }
+                              >
+                                <img
+                                  src={attachment.url}
+                                  alt={`${task.title} complaint photo ${
+                                    index + 1
+                                  }`}
+                                />
+                              </button>
+                            ))}
+                          {getTaskComplaintAttachments(task).length > 3 ? (
+                            <span className="task-complaint-attachment-more">
+                              +{getTaskComplaintAttachments(task).length - 3}
+                            </span>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          className="task-complaint-attachment-trigger"
+                          onClick={() => openTaskComplaintPhotoPreview(task, 0)}
+                        >
+                          {getTaskComplaintAttachments(task).length === 1
+                            ? "View complaint photo"
+                            : `View ${getTaskComplaintAttachments(task).length} complaint photos`}
+                        </button>
+                      </div>
+                    ) : null}
                   </td>
                   <td style={cellStyle}>
                     {task.deadline
@@ -986,6 +1175,96 @@ function Tasks() {
           </tbody>
         </table>
       </div>
+
+      {activeComplaintPhoto ? (
+        <div
+          className="complaint-photo-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Complaint photo preview"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeComplaintPhotoPreview();
+            }
+          }}
+        >
+          <div className="complaint-photo-lightbox-dialog">
+            <button
+              type="button"
+              className="complaint-photo-lightbox-close"
+              onClick={closeComplaintPhotoPreview}
+            >
+              <FaXmark />
+              <span>Close</span>
+            </button>
+
+            <div className="complaint-photo-lightbox-header">
+              <div>
+                <p className="complaint-photo-lightbox-label">
+                  Complaint photo
+                </p>
+                <h2>{complaintPhotoPreview.title || "Complaint"}</h2>
+              </div>
+              <span className="complaint-photo-lightbox-count">
+                {complaintPhotoPreview.index + 1} of{" "}
+                {complaintPhotoPreview.attachments.length}
+              </span>
+            </div>
+
+            <div className="complaint-photo-lightbox-stage">
+              {complaintPhotoPreview.attachments.length > 1 ? (
+                <button
+                  type="button"
+                  className="complaint-photo-lightbox-nav"
+                  onClick={() =>
+                    setComplaintPhotoPreview((currentPreview) => ({
+                      ...currentPreview,
+                      index:
+                        (currentPreview.index - 1 +
+                          currentPreview.attachments.length) %
+                        currentPreview.attachments.length,
+                    }))
+                  }
+                  aria-label="View previous complaint photo"
+                >
+                  <FaChevronLeft />
+                </button>
+              ) : null}
+
+              <img
+                src={activeComplaintPhoto.url}
+                alt={`${complaintPhotoPreview.title} photo ${
+                  complaintPhotoPreview.index + 1
+                }`}
+                className="complaint-photo-lightbox-image"
+              />
+
+              {complaintPhotoPreview.attachments.length > 1 ? (
+                <button
+                  type="button"
+                  className="complaint-photo-lightbox-nav"
+                  onClick={() =>
+                    setComplaintPhotoPreview((currentPreview) => ({
+                      ...currentPreview,
+                      index:
+                        (currentPreview.index + 1) %
+                        currentPreview.attachments.length,
+                    }))
+                  }
+                  aria-label="View next complaint photo"
+                >
+                  <FaChevronRight />
+                </button>
+              ) : null}
+            </div>
+
+            <div className="complaint-photo-lightbox-footer">
+              <span>{activeComplaintPhoto.originalName || "Complaint image"}</span>
+              <span>{formatFileSize(activeComplaintPhoto.size)}</span>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

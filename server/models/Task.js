@@ -59,4 +59,7 @@ const taskSchema = new mongoose.Schema(
 { timestamps: true }
 );
 
+taskSchema.index({ serviceProvider: 1, status: 1 });
+taskSchema.index({ serviceProvider: 1, completedAt: -1 });
+
 module.exports = mongoose.model("Task", taskSchema);

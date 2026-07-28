@@ -65,4 +65,6 @@ const serviceProviderSchema = new mongoose.Schema(
 { timestamps: true }
 );
 
+serviceProviderSchema.index({ email: 1 });
+
 module.exports = mongoose.model("ServiceProvider", serviceProviderSchema);
