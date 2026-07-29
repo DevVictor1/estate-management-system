@@ -29,6 +29,13 @@ const paymentSchema = new mongoose.Schema(
       default: "bank_transfer",
     },
 
+    paymentType: {
+      type: String,
+      enum: ["advance", "partial", "final", "reimbursement"],
+      default: "final",
+      required: true,
+    },
+
     status: {
       type: String,
       enum: ["pending", "paid", "failed", "cancelled"],
@@ -49,5 +56,6 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.index({ serviceProvider: 1, paymentDate: -1, status: 1 });
+paymentSchema.index({ contract: 1, status: 1 });
 
 module.exports = mongoose.model("Payment", paymentSchema);

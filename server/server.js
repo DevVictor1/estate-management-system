@@ -27,7 +27,7 @@ app.use("/api/auth", authRoutes);
 
 // Routes placeholder
 app.get("/", (req, res) => {
-  res.send("Estate Management API Running...");
+  res.send("EstateHub API Running...");
 });
 
 // Connect DB

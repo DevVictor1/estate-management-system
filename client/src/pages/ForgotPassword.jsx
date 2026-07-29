@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
+import AuthBranding from "../components/AuthBranding";
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -35,9 +36,10 @@ function ForgotPassword() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ maxWidth: "460px" }}>
-        <h1 style={{ marginBottom: "8px" }}>Forgot Password</h1>
+        <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
         <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-          Enter your email address and we will send you a secure password reset link.
+          Enter your email address and we will send you a secure EstateHub
+          password reset link.
         </p>
 
         <form onSubmit={handleSubmit}>

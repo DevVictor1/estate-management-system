@@ -1,3 +1,5 @@
+const { buildEmailBrandHeader } = require("./brandAssets");
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -62,14 +64,11 @@ const buildComplaintSubmittedEmail = ({
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="background: #0b1f3a; color: #ffffff; padding: 20px 24px;">
-            <h1 style="margin: 0; font-size: 24px;">Estate Management</h1>
-            <p style="margin: 8px 0 0; font-size: 14px;">New resident complaint</p>
-          </div>
+          ${buildEmailBrandHeader("New resident complaint")}
           <div style="padding: 24px;">
             <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">A new resident complaint has been submitted.</h2>
             <p style="margin: 0 0 20px; color: #64748b;">
-              Log in to the Estate Management System to review and assign the appropriate service provider.
+              Log in to EstateHub to review and assign the appropriate service provider.
             </p>
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
@@ -109,11 +108,11 @@ const buildComplaintSubmittedEmail = ({
       </div>
     `,
     text: [
-      "Estate Management",
+      "EstateHub",
       "New resident complaint",
       "",
       "A new resident complaint has been submitted.",
-      "Log in to the Estate Management System to review and assign the appropriate service provider.",
+      "Log in to EstateHub to review and assign the appropriate service provider.",
       "",
       `Complaint title: ${complaintTitle || "Untitled complaint"}`,
       `Resident name: ${residentName || "Not provided"}`,

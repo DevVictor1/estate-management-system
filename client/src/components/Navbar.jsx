@@ -14,7 +14,7 @@ function Navbar() {
     <header className="topbar">
       <div>
         <p className="topbar-label">
-          Estate Service Provider and Contractor Management System
+          Estate Service Provider & Contractor Management System
         </p>
         <h2 className="topbar-title">Control Panel</h2>
       </div>

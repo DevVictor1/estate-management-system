@@ -1,3 +1,5 @@
+const { buildEmailBrandHeader } = require("./brandAssets");
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -124,14 +126,11 @@ const buildProviderContractCreatedEmail = ({
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="background: #0b1f3a; color: #ffffff; padding: 20px 24px;">
-            <h1 style="margin: 0; font-size: 24px;">Estate Management</h1>
-            <p style="margin: 8px 0 0; font-size: 14px;">Contract creation update</p>
-          </div>
+          ${buildEmailBrandHeader("Contract creation update")}
           <div style="padding: 24px;">
             <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">A new contract has been created for your company.</h2>
             <p style="margin: 0 0 20px; color: #64748b;">
-              Hello ${safeProviderName}, log in to the Estate Management System to review your contract details.
+              Hello ${safeProviderName}, log in to EstateHub to review your contract details.
             </p>
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
@@ -160,11 +159,11 @@ const buildProviderContractCreatedEmail = ({
       </div>
     `,
     text: [
-      "Estate Management",
+      "EstateHub",
       "Contract creation update",
       "",
       `Hello ${providerName || "Service provider"}, a new contract has been created for your company.`,
-      "Log in to the Estate Management System to review your contract details.",
+      "Log in to EstateHub to review your contract details.",
       "",
       `Company name: ${companyName || "Not provided"}`,
       `Contract title: ${contractTitle || "Untitled contract"}`,

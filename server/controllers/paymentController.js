@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const Payment = require("../models/Payment");
 const Contract = require("../models/Contract");
 const ServiceProvider = require("../models/ServiceProvider");
@@ -9,9 +11,42 @@ const {
 const {
   resolveVerifiedUserEmailRecipient,
 } = require("../utils/verifiedRecipients");
+const {
+  PAYMENT_TYPES,
+  PAYMENT_STATUSES,
+  CONTRACT_PROGRESS_PAYMENT_TYPES,
+  formatCurrency,
+  buildContractFinancialSummaryMap,
+  attachFinancialSummaryToContract,
+  getPaymentScopeMatch,
+  calculateContractFinancialSnapshot,
+  buildPaymentWarnings,
+} = require("../utils/paymentFinancials");
+
+const paymentPopulate = [
+  {
+    path: "serviceProvider",
+    select: "companyName serviceCategory phone email contactPerson",
+  },
+  {
+    path: "contract",
+    select: "contractTitle contractValue status serviceProvider paymentTerms",
+    populate: {
+      path: "serviceProvider",
+      select: "companyName serviceCategory email",
+    },
+  },
+];
 
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
+const normalizePaymentTypeLabel = (paymentType = "final") =>
+  String(paymentType || "final")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 const getPaymentNotificationRecipient = async (provider) => {
   const { emailPaymentRecipient } = getEmailConfig();
@@ -47,123 +82,345 @@ const getPaymentsReviewUrl = () => {
   return `${clientUrl.replace(/\/+$/, "")}/payments`;
 };
 
+const buildValidationError = (message, statusCode = 400) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+const parsePositiveAmount = (value) => {
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw buildValidationError("Amount must be a valid positive number.");
+  }
+
+  return amount;
+};
+
+const parseOptionalDate = (value) => {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw buildValidationError("Payment date must be a valid date.");
+  }
+
+  return date;
+};
+
+const validateObjectId = (value, label) => {
+  if (!value || !mongoose.Types.ObjectId.isValid(String(value))) {
+    throw buildValidationError(`${label} must be a valid record identifier.`);
+  }
+};
+
+const buildPaymentPayload = (body = {}) => {
+  const paymentType = String(body.paymentType || "final").trim().toLowerCase();
+  const status = String(body.status || "pending").trim().toLowerCase();
+  const paymentMethod = String(body.paymentMethod || "bank_transfer")
+    .trim()
+    .toLowerCase();
+
+  if (!PAYMENT_TYPES.includes(paymentType)) {
+    throw buildValidationError(
+      "Invalid payment type. Allowed values are advance, partial, final, and reimbursement."
+    );
+  }
+
+  if (!PAYMENT_STATUSES.includes(status)) {
+    throw buildValidationError(
+      "Invalid payment status. Allowed values are pending, paid, failed, and cancelled."
+    );
+  }
+
+  validateObjectId(body.serviceProvider, "Service provider");
+  validateObjectId(body.contract, "Contract");
+
+  return {
+    serviceProvider: body.serviceProvider,
+    contract: body.contract,
+    amount: parsePositiveAmount(body.amount),
+    paymentDate: parseOptionalDate(body.paymentDate),
+    paymentMethod,
+    paymentType,
+    status,
+    referenceNumber: body.referenceNumber?.trim() || "",
+    notes: body.notes?.trim() || "",
+  };
+};
+
+const getValidatedPaymentContext = async (payload) => {
+  const [contract, serviceProvider] = await Promise.all([
+    Contract.findById(payload.contract).select(
+      "contractTitle contractValue serviceProvider status paymentTerms"
+    ),
+    ServiceProvider.findById(payload.serviceProvider).select(
+      "companyName email contactPerson serviceCategory"
+    ),
+  ]);
+
+  if (!contract) {
+    throw buildValidationError("The selected contract could not be found.", 404);
+  }
+
+  if (!serviceProvider) {
+    throw buildValidationError(
+      "The selected service provider could not be found.",
+      404
+    );
+  }
+
+  if (!contract.serviceProvider) {
+    throw buildValidationError(
+      "The selected contract is not linked to a service provider."
+    );
+  }
+
+  if (String(contract.serviceProvider) !== String(serviceProvider._id)) {
+    throw buildValidationError(
+      "The selected contract does not belong to the selected service provider."
+    );
+  }
+
+  return {
+    contract,
+    serviceProvider,
+  };
+};
+
+const validateContractPaymentLimits = async ({
+  payload,
+  contract,
+  existingPaymentId,
+}) => {
+  const summary = await calculateContractFinancialSnapshot({
+    contractId: contract._id,
+    contractValue: contract.contractValue,
+    excludePaymentId: existingPaymentId,
+  });
+  const warnings = buildPaymentWarnings({
+    amount: payload.amount,
+    paymentType: payload.paymentType,
+    status: payload.status,
+    currentSummary: summary,
+    contractValue: contract.contractValue,
+  });
+
+  if (!CONTRACT_PROGRESS_PAYMENT_TYPES.includes(payload.paymentType)) {
+    return {
+      warnings,
+      summary,
+    };
+  }
+
+  if (payload.paymentType === "final" && payload.amount > summary.outstandingBalance) {
+    const remainingBalance = formatCurrency(summary.outstandingBalance);
+    throw buildValidationError(
+      `The final payment cannot exceed the remaining contract balance of ${remainingBalance}.`
+    );
+  }
+
+  if (payload.status === "paid") {
+    const projectedTotal = summary.contractPaymentsPaid + payload.amount;
+
+    if (projectedTotal > Number(contract.contractValue || 0)) {
+      const overpaidBy = projectedTotal - Number(contract.contractValue || 0);
+      throw buildValidationError(
+        `The paid amount would exceed the contract value by ${formatCurrency(
+          overpaidBy
+        )}.`
+      );
+    }
+  }
+
+  return {
+    warnings,
+    summary,
+  };
+};
+
+const populatePaymentRecord = async (paymentId) => {
+  const payment = await Payment.findById(paymentId).populate(paymentPopulate);
+
+  if (!payment) {
+    return null;
+  }
+
+  if (!payment.contract) {
+    return payment.toObject();
+  }
+
+  const summaryMap = await buildContractFinancialSummaryMap([payment.contract]);
+  const paymentObject = payment.toObject();
+
+  paymentObject.contract = attachFinancialSummaryToContract(
+    payment.contract,
+    summaryMap
+  );
+
+  return paymentObject;
+};
+
+const sendPaymentNotification = async ({
+  payment,
+  contract,
+  serviceProvider,
+}) => {
+  if (!contract) {
+    console.warn(
+      "Payment recorded, but the linked contract could not be found for email notification."
+    );
+    return;
+  }
+
+  if (!contract.serviceProvider) {
+    console.warn(
+      "Payment recorded, but the linked contract does not have a service provider for email notification."
+    );
+    return;
+  }
+
+  if (!serviceProvider) {
+    console.warn(
+      "Payment recorded, but the linked service provider could not be found for email notification."
+    );
+    return;
+  }
+
+  const recipients = await getPaymentNotificationRecipient(serviceProvider);
+
+  if (!recipients.length) {
+    console.warn(
+      "Payment recorded, but no valid payment email recipient was available."
+    );
+    return;
+  }
+
+  const emailPayload = buildPaymentRecordedEmail({
+    companyName: serviceProvider.companyName,
+    contractTitle: contract.contractTitle,
+    amount: payment.amount,
+    paymentDate: payment.paymentDate,
+    paymentType: normalizePaymentTypeLabel(payment.paymentType),
+    paymentMethod: payment.paymentMethod,
+    paymentStatus: payment.status,
+    referenceNumber: payment.referenceNumber,
+    notes: payment.notes,
+    reviewUrl: getPaymentsReviewUrl(),
+  });
+
+  const emailResult = await sendEmail({
+    to: recipients,
+    subject: emailPayload.subject,
+    html: emailPayload.html,
+    text: emailPayload.text,
+  });
+
+  if (!emailResult.success) {
+    console.warn("Payment recorded, but provider notification email failed.");
+  }
+};
+
 const createPayment = async (req, res) => {
   try {
-    const payment = await Payment.create(req.body);
+    const payload = buildPaymentPayload(req.body);
+    const { contract, serviceProvider } = await getValidatedPaymentContext(payload);
+    const { warnings } = await validateContractPaymentLimits({
+      payload,
+      contract,
+    });
+    const payment = await Payment.create({
+      ...payload,
+      paymentDate: payload.paymentDate || undefined,
+    });
 
-    const contract = payment.contract
-      ? await Contract.findById(payment.contract).select(
-          "contractTitle serviceProvider"
-        )
-      : null;
+    await sendPaymentNotification({ payment, contract, serviceProvider });
 
-    if (!contract) {
-      console.warn(
-        "Payment recorded, but the linked contract could not be found for email notification."
-      );
-    } else if (!contract.serviceProvider) {
-      console.warn(
-        "Payment recorded, but the linked contract does not have a service provider for email notification."
-      );
-    } else {
-      const serviceProvider = await ServiceProvider.findById(
-        contract.serviceProvider
-      ).select("companyName email");
-
-      if (!serviceProvider) {
-        console.warn(
-          "Payment recorded, but the linked service provider could not be found for email notification."
-        );
-      } else {
-        const recipients = await getPaymentNotificationRecipient(serviceProvider);
-
-        if (!recipients.length) {
-          console.warn(
-            "Payment recorded, but no valid payment email recipient was available."
-          );
-        } else {
-          const emailPayload = buildPaymentRecordedEmail({
-            companyName: serviceProvider.companyName,
-            contractTitle: contract.contractTitle,
-            amount: payment.amount,
-            paymentDate: payment.paymentDate,
-            paymentMethod: payment.paymentMethod,
-            paymentStatus: payment.status,
-            referenceNumber: payment.referenceNumber,
-            notes: payment.notes,
-            reviewUrl: getPaymentsReviewUrl(),
-          });
-
-          const emailResult = await sendEmail({
-            to: recipients,
-            subject: emailPayload.subject,
-            html: emailPayload.html,
-            text: emailPayload.text,
-          });
-
-          if (!emailResult.success) {
-            console.warn(
-              "Payment recorded, but provider notification email failed."
-            );
-          }
-        }
-      }
-    }
+    const populatedPayment = await populatePaymentRecord(payment._id);
 
     res.status(201).json({
       success: true,
       message: "Payment recorded successfully",
-      data: payment,
+      ...(warnings.length ? { warnings } : {}),
+      data: populatedPayment,
     });
   } catch (error) {
-    res.status(500).json({
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    res.status(statusCode).json({
       success: false,
-      message: "Failed to record payment",
-      error: error.message,
+      message:
+        statusCode >= 500 ? "Failed to record payment" : error.message,
     });
   }
 };
 
 const getPayments = async (req, res) => {
   try {
-    const payments = await Payment.find()
-      .populate("serviceProvider", "companyName serviceCategory phone")
-      .populate({
-        path: "contract",
-        select: "contractTitle contractValue status serviceProvider",
-        populate: {
-          path: "serviceProvider",
-          select: "companyName serviceCategory email",
-        },
-      })
+    const scopeMatch = await getPaymentScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access payment records.",
+      });
+    }
+
+    const payments = await Payment.find(scopeMatch)
+      .populate(paymentPopulate)
       .sort({ createdAt: -1 });
+
+    const contractsForSummary = payments
+      .map((payment) => payment.contract)
+      .filter(Boolean);
+    const summaryMap = await buildContractFinancialSummaryMap(contractsForSummary);
+    const paymentData = payments.map((payment) => {
+      const paymentObject = payment.toObject();
+
+      if (payment.contract) {
+        paymentObject.contract = attachFinancialSummaryToContract(
+          payment.contract,
+          summaryMap
+        );
+      }
+
+      return paymentObject;
+    });
 
     res.status(200).json({
       success: true,
-      count: payments.length,
-      data: payments,
+      count: paymentData.length,
+      data: paymentData,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to fetch payments",
-      error: error.message,
     });
   }
 };
 
 const getPaymentById = async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id)
-      .populate("serviceProvider", "companyName serviceCategory phone")
-      .populate({
-        path: "contract",
-        select: "contractTitle contractValue status serviceProvider",
-        populate: {
-          path: "serviceProvider",
-          select: "companyName serviceCategory email",
-        },
+    const scopeMatch = await getPaymentScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access payment records.",
       });
+    }
+
+    const payment = await Payment.findOne({
+      _id: req.params.id,
+      ...scopeMatch,
+    }).populate(paymentPopulate);
 
     if (!payment) {
       return res.status(404).json({
@@ -172,43 +429,71 @@ const getPaymentById = async (req, res) => {
       });
     }
 
+    let paymentData = payment.toObject();
+
+    if (payment.contract) {
+      const summaryMap = await buildContractFinancialSummaryMap([payment.contract]);
+      paymentData.contract = attachFinancialSummaryToContract(
+        payment.contract,
+        summaryMap
+      );
+    }
+
     res.status(200).json({
       success: true,
-      data: payment,
+      data: paymentData,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to fetch payment",
-      error: error.message,
     });
   }
 };
 
 const updatePayment = async (req, res) => {
   try {
-    const payment = await Payment.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const existingPayment = await Payment.findById(req.params.id);
 
-    if (!payment) {
+    if (!existingPayment) {
       return res.status(404).json({
         success: false,
         message: "Payment not found",
       });
     }
 
+    const payload = buildPaymentPayload(req.body);
+    const { contract, serviceProvider } = await getValidatedPaymentContext(payload);
+    const { warnings } = await validateContractPaymentLimits({
+      payload,
+      contract,
+      existingPaymentId: existingPayment._id,
+    });
+
+    Object.assign(existingPayment, {
+      ...payload,
+      paymentDate: payload.paymentDate || existingPayment.paymentDate,
+    });
+
+    await existingPayment.save();
+
+    const populatedPayment = await populatePaymentRecord(existingPayment._id);
+
     res.status(200).json({
       success: true,
       message: "Payment updated successfully",
-      data: payment,
+      ...(warnings.length ? { warnings } : {}),
+      data: populatedPayment,
     });
   } catch (error) {
-    res.status(500).json({
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    res.status(statusCode).json({
       success: false,
-      message: "Failed to update payment",
-      error: error.message,
+      message:
+        statusCode >= 500 ? "Failed to update payment" : error.message,
     });
   }
 };
@@ -232,7 +517,6 @@ const deletePayment = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to delete payment",
-      error: error.message,
     });
   }
 };

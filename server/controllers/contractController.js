@@ -8,6 +8,11 @@ const {
 const {
   resolveVerifiedUserEmailRecipient,
 } = require("../utils/verifiedRecipients");
+const {
+  attachFinancialSummaryToContract,
+  attachFinancialSummariesToContracts,
+  getProviderIdsForUser,
+} = require("../utils/paymentFinancials");
 
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
@@ -44,6 +49,26 @@ const getContractsReviewUrl = () => {
   }
 
   return `${clientUrl.replace(/\/+$/, "")}/contracts`;
+};
+
+const getContractScopeMatch = async (user) => {
+  if (user?.role === "admin") {
+    return {};
+  }
+
+  if (user?.role === "service_provider") {
+    const providerIds = await getProviderIdsForUser(user);
+
+    if (!providerIds.length) {
+      return { _id: null };
+    }
+
+    return {
+      serviceProvider: { $in: providerIds },
+    };
+  }
+
+  return null;
 };
 
 const createContract = async (req, res) => {
@@ -94,10 +119,18 @@ const createContract = async (req, res) => {
       }
     }
 
+    const populatedContract = await Contract.findById(contract._id).populate(
+      "serviceProvider",
+      "companyName serviceCategory phone email"
+    );
+    const [contractWithSummary] = await attachFinancialSummariesToContracts([
+      populatedContract,
+    ]);
+
     res.status(201).json({
       success: true,
       message: "Contract created successfully",
-      data: contract,
+      data: contractWithSummary,
     });
   } catch (error) {
     res.status(500).json({
@@ -110,30 +143,50 @@ const createContract = async (req, res) => {
 
 const getContracts = async (req, res) => {
   try {
-    const contracts = await Contract.find()
+    const scopeMatch = await getContractScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access contracts.",
+      });
+    }
+
+    const contracts = await Contract.find(scopeMatch)
       .populate("serviceProvider", "companyName serviceCategory phone email")
       .sort({ createdAt: -1 });
+    const contractsWithSummaries = await attachFinancialSummariesToContracts(
+      contracts
+    );
 
     res.status(200).json({
       success: true,
-      count: contracts.length,
-      data: contracts,
+      count: contractsWithSummaries.length,
+      data: contractsWithSummaries,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to fetch contracts",
-      error: error.message,
     });
   }
 };
 
 const getContractById = async (req, res) => {
   try {
-    const contract = await Contract.findById(req.params.id).populate(
-      "serviceProvider",
-      "companyName serviceCategory phone email"
-    );
+    const scopeMatch = await getContractScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access contracts.",
+      });
+    }
+
+    const contract = await Contract.findOne({
+      _id: req.params.id,
+      ...scopeMatch,
+    }).populate("serviceProvider", "companyName serviceCategory phone email");
 
     if (!contract) {
       return res.status(404).json({
@@ -142,29 +195,28 @@ const getContractById = async (req, res) => {
       });
     }
 
+    const contractsWithSummaries = await attachFinancialSummariesToContracts([
+      contract,
+    ]);
+
     res.status(200).json({
       success: true,
-      data: contract,
+      data: contractsWithSummaries[0],
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Failed to fetch contract",
-      error: error.message,
     });
   }
 };
 
 const updateContract = async (req, res) => {
   try {
-    const contract = await Contract.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
+    const contract = await Contract.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    }).populate("serviceProvider", "companyName serviceCategory phone email");
 
     if (!contract) {
       return res.status(404).json({
@@ -173,10 +225,14 @@ const updateContract = async (req, res) => {
       });
     }
 
+    const [contractWithSummary] = await attachFinancialSummariesToContracts([
+      contract,
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Contract updated successfully",
-      data: contract,
+      data: contractWithSummary,
     });
   } catch (error) {
     res.status(500).json({

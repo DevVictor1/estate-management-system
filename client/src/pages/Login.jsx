@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import AuthBranding from "../components/AuthBranding";
 
 const initialVerificationMessage =
   "Your email address has not been verified yet. Check your inbox for the verification message or request a new one below.";
@@ -104,10 +105,7 @@ function Login() {
           boxShadow: "0 12px 30px rgba(11, 31, 58, 0.08)",
         }}
       >
-        <h1 style={{ marginBottom: "8px" }}>Login</h1>
-        <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-          Sign in to access the estate management dashboard.
-        </p>
+        <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "16px" }}>

@@ -1,3 +1,5 @@
+const { buildEmailBrandHeader } = require("./brandAssets");
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -54,14 +56,11 @@ const buildProviderApprovedEmail = ({
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="background: #0b1f3a; color: #ffffff; padding: 20px 24px;">
-            <h1 style="margin: 0; font-size: 24px;">Estate Management</h1>
-            <p style="margin: 8px 0 0; font-size: 14px;">Service provider approval update</p>
-          </div>
+          ${buildEmailBrandHeader("Service provider approval update")}
           <div style="padding: 24px;">
             <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">Your registration has been approved.</h2>
             <p style="margin: 0 0 20px; color: #64748b;">
-              Hello ${safeProviderName}, you can now log in to the Estate Management System and view tasks assigned to your company.
+              Hello ${safeProviderName}, you can now log in to EstateHub and view tasks assigned to your company.
             </p>
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
@@ -93,11 +92,11 @@ const buildProviderApprovedEmail = ({
       </div>
     `,
     text: [
-      "Estate Management",
+      "EstateHub",
       "Service provider approval update",
       "",
       `Hello ${providerName || "Service provider"}, your registration has been approved.`,
-      "You can now log in to the Estate Management System and view tasks assigned to your company.",
+      "You can now log in to EstateHub and view tasks assigned to your company.",
       "",
       `Contact name: ${providerName || "Service provider"}`,
       `Company name: ${companyName || "Not provided"}`,

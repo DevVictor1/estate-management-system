@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../services/api";
+import AuthBranding from "../components/AuthBranding";
 
 function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -55,9 +56,9 @@ function ResetPassword() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ maxWidth: "460px" }}>
-        <h1 style={{ marginBottom: "8px" }}>Reset Password</h1>
+        <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
         <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-          Create a new password for your Estate Management account.
+          Create a new password for your EstateHub account.
         </p>
 
         {invalidLink ? (

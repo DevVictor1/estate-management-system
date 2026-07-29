@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import AuthBranding from "../components/AuthBranding";
 
 const initialFormData = {
   fullName: "",
@@ -108,9 +109,10 @@ function Register() {
     return (
       <div className="auth-page auth-page-register">
         <div className="auth-card auth-card-register">
-          <h1 style={{ marginBottom: "8px" }}>Account Created</h1>
+          <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
           <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-            Check your inbox to finish setting up your account.
+            Your account has been created. Check your inbox to finish setting up
+            EstateHub.
           </p>
 
           <div
@@ -184,10 +186,7 @@ function Register() {
   return (
     <div className="auth-page auth-page-register">
       <div className="auth-card auth-card-register">
-        <h1 style={{ marginBottom: "8px" }}>Create Account</h1>
-        <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-          Register to access the estate management system.
-        </p>
+        <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
 
         <form onSubmit={handleSubmit}>
           <div

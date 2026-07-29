@@ -1,3 +1,5 @@
+const { buildEmailBrandHeader } = require("./brandAssets");
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -99,14 +101,11 @@ const buildTaskAssignedEmail = ({
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="background: #0b1f3a; color: #ffffff; padding: 20px 24px;">
-            <h1 style="margin: 0; font-size: 24px;">Estate Management</h1>
-            <p style="margin: 8px 0 0; font-size: 14px;">New task assignment</p>
-          </div>
+          ${buildEmailBrandHeader("New task assignment")}
           <div style="padding: 24px;">
             <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">A new task has been assigned to you.</h2>
             <p style="margin: 0 0 20px; color: #64748b;">
-              Hello ${safeProviderName}, log in to the Estate Management System to review the task and update its progress.
+              Hello ${safeProviderName}, log in to EstateHub to review the task and update its progress.
             </p>
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
@@ -141,11 +140,11 @@ const buildTaskAssignedEmail = ({
       </div>
     `,
     text: [
-      "Estate Management",
+      "EstateHub",
       "New task assignment",
       "",
       `Hello ${providerName || "Service provider"}, a new task has been assigned to you.`,
-      "Log in to the Estate Management System to review the task and update its progress.",
+      "Log in to EstateHub to review the task and update its progress.",
       "",
       `Task title: ${taskTitle || "Untitled task"}`,
       `Task description: ${taskDescription || "No task description was provided."}`,

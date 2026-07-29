@@ -1,3 +1,5 @@
+const { buildEmailBrandHeader } = require("./brandAssets");
+
 const escapeHtml = (value = "") =>
   String(value)
     .replace(/&/g, "&amp;")
@@ -45,21 +47,18 @@ const buildVerifyEmailTemplate = ({
     : "";
 
   return {
-    subject: "Verify Your Estate Management Account",
+    subject: "Verify Your EstateHub Account",
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
-          <div style="background: #0b1f3a; color: #ffffff; padding: 20px 24px;">
-            <h1 style="margin: 0; font-size: 24px;">Estate Management</h1>
-            <p style="margin: 8px 0 0; font-size: 14px;">Email verification</p>
-          </div>
+          ${buildEmailBrandHeader("Email verification")}
           <div style="padding: 24px;">
             <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">Verify your email address</h2>
             <p style="margin: 0 0 16px; color: #64748b;">
               Hello ${safeUserName},
             </p>
             <p style="margin: 0 0 16px; color: #64748b;">
-              Thank you for creating an Estate Management account. Confirm your email address to activate email notifications and complete your account setup.
+              Thank you for creating an EstateHub account. Confirm your email address to activate email notifications and complete your account setup.
             </p>
             <p style="margin: 0; color: #64748b;">
               This verification link will expire in ${safeExpiresInMinutes} minute${
@@ -76,11 +75,11 @@ const buildVerifyEmailTemplate = ({
       </div>
     `,
     text: [
-      "Estate Management",
+      "EstateHub",
       "Email verification",
       "",
       `Hello ${userName || "there"},`,
-      "Thank you for creating an Estate Management account. Confirm your email address to activate email notifications and complete your account setup.",
+      "Thank you for creating an EstateHub account. Confirm your email address to activate email notifications and complete your account setup.",
       `This verification link will expire in ${safeExpiresInMinutes} minute${
         safeExpiresInMinutes === 1 ? "" : "s"
       }.`,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -37,7 +37,12 @@ const formatContractDate = (value) => {
     return "-";
   }
 
-  return dateFormatter.format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return dateFormatter.format(date);
 };
 
 const formatContractStatusLabel = (status) => {
@@ -98,21 +103,26 @@ function Contracts() {
     try {
       setError("");
 
-      const [contractsResponse, providersResponse] = await Promise.all([
-        api.get("/api/contracts"),
-        api.get("/api/service-providers"),
-      ]);
+      if (isAdmin) {
+        const [contractsResponse, providersResponse] = await Promise.all([
+          api.get("/api/contracts"),
+          api.get("/api/service-providers"),
+        ]);
 
-      const fetchedContracts = contractsResponse.data.data || [];
-      const fetchedProviders = providersResponse.data.data || [];
+        const fetchedContracts = contractsResponse.data.data || [];
+        const fetchedProviders = providersResponse.data.data || [];
 
-      setContracts(fetchedContracts);
-      setProviders(fetchedProviders);
-      setFormData((currentFormData) => ({
-        ...currentFormData,
-        serviceProvider:
-          currentFormData.serviceProvider || fetchedProviders[0]?._id || "",
-      }));
+        setContracts(fetchedContracts);
+        setProviders(fetchedProviders);
+        setFormData((currentFormData) => ({
+          ...currentFormData,
+          serviceProvider:
+            currentFormData.serviceProvider || fetchedProviders[0]?._id || "",
+        }));
+      } else {
+        const contractsResponse = await api.get("/api/contracts");
+        setContracts(contractsResponse.data.data || []);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Failed to load contracts.");
     } finally {
@@ -236,16 +246,10 @@ function Contracts() {
     startDateFilter !== initialContractFilters.startDateFilter ||
     endDateFilter !== initialContractFilters.endDateFilter;
 
-  const normalizedUserEmail = user?.email?.trim().toLowerCase();
+  const providerContracts = useMemo(() => contracts, [contracts]);
 
-  const providerContracts = contracts.filter(
-    (contract) =>
-      contract.serviceProvider?.email?.trim().toLowerCase() ===
-      normalizedUserEmail
-  );
-
-  const sortedProviderContracts = [...providerContracts]
-    .sort((firstContract, secondContract) => {
+  const sortedProviderContracts = [...providerContracts].sort(
+    (firstContract, secondContract) => {
       const firstIsActive = firstContract.status === "active" ? 1 : 0;
       const secondIsActive = secondContract.status === "active" ? 1 : 0;
 
@@ -261,13 +265,12 @@ function Contracts() {
         : 0;
 
       return secondStartDate - firstStartDate;
-    });
+    }
+  );
 
   const currentContract = sortedProviderContracts.at(0);
   const previousContracts = currentContract
-    ? sortedProviderContracts.filter(
-        (contract) => contract._id !== currentContract._id
-      )
+    ? sortedProviderContracts.filter((contract) => contract._id !== currentContract._id)
     : [];
 
   if (loading) {
@@ -362,9 +365,7 @@ function Contracts() {
                   </div>
 
                   <div className="provider-contract-field provider-contract-field-full">
-                    <span className="provider-contract-label">
-                      Contract Period
-                    </span>
+                    <span className="provider-contract-label">Contract Period</span>
                     <div className="provider-contract-period">
                       <div className="provider-contract-period-item">
                         <span className="provider-contract-period-label">
@@ -386,21 +387,24 @@ function Contracts() {
                   </div>
 
                   <div className="provider-contract-field">
-                    <span className="provider-contract-label">
-                      Payment Terms
-                    </span>
+                    <span className="provider-contract-label">Payment Terms</span>
                     <strong className="provider-contract-value">
                       {currentContract.paymentTerms || "-"}
                     </strong>
                   </div>
 
                   <div className="provider-contract-field">
-                    <span className="provider-contract-label">
-                      Contract Value
-                    </span>
+                    <span className="provider-contract-label">Contract Value</span>
                     <strong className="provider-contract-value provider-contract-value-currency">
                       {currencyFormatter.format(currentContract.contractValue || 0)}
                     </strong>
+                  </div>
+
+                  <div className="provider-contract-field provider-contract-field-full">
+                    <span className="provider-contract-label">
+                      Financial Summary
+                    </span>
+                    {renderFinancialSummary(currentContract.financialSummary)}
                   </div>
 
                   <div className="provider-contract-field provider-contract-field-full">
@@ -463,13 +467,15 @@ function Contracts() {
                           </strong>
                         </div>
                         <div className="provider-contract-history-item">
-                          <span className="provider-contract-label">
-                            Status
-                          </span>
+                          <span className="provider-contract-label">Status</span>
                           <strong className="provider-contract-value">
                             {formatContractStatusLabel(contract.status)}
                           </strong>
                         </div>
+                      </div>
+
+                      <div style={{ marginTop: "16px" }}>
+                        {renderFinancialSummary(contract.financialSummary)}
                       </div>
                     </article>
                   ))}
@@ -601,199 +607,199 @@ function Contracts() {
             borderRadius: "14px",
           }}
         >
-        <div>
-          <label
-            htmlFor="serviceProvider"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Service Provider
-          </label>
-          <select
-            id="serviceProvider"
-            name="serviceProvider"
-            value={formData.serviceProvider}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="">Select a provider</option>
-            {providers.map((provider) => (
-              <option key={provider._id} value={provider._id}>
-                {provider.companyName}
-              </option>
-            ))}
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="serviceProvider"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Service Provider
+            </label>
+            <select
+              id="serviceProvider"
+              name="serviceProvider"
+              value={formData.serviceProvider}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            >
+              <option value="">Select a provider</option>
+              {providers.map((provider) => (
+                <option key={provider._id} value={provider._id}>
+                  {provider.companyName}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <div>
-          <label
-            htmlFor="contractTitle"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Contract Title
-          </label>
-          <input
-            id="contractTitle"
-            name="contractTitle"
-            type="text"
-            value={formData.contractTitle}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="contractTitle"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Contract Title
+            </label>
+            <input
+              id="contractTitle"
+              name="contractTitle"
+              type="text"
+              value={formData.contractTitle}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="startDate"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Start Date
-          </label>
-          <input
-            id="startDate"
-            name="startDate"
-            type="date"
-            value={formData.startDate}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="startDate"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Start Date
+            </label>
+            <input
+              id="startDate"
+              name="startDate"
+              type="date"
+              value={formData.startDate}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="endDate"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            End Date
-          </label>
-          <input
-            id="endDate"
-            name="endDate"
-            type="date"
-            value={formData.endDate}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="endDate"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              End Date
+            </label>
+            <input
+              id="endDate"
+              name="endDate"
+              type="date"
+              value={formData.endDate}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="paymentTerms"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Payment Terms
-          </label>
-          <input
-            id="paymentTerms"
-            name="paymentTerms"
-            type="text"
-            value={formData.paymentTerms}
-            onChange={handleChange}
-            style={inputStyle}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="paymentTerms"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Payment Terms
+            </label>
+            <input
+              id="paymentTerms"
+              name="paymentTerms"
+              type="text"
+              value={formData.paymentTerms}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="contractValue"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Contract Value
-          </label>
-          <input
-            id="contractValue"
-            name="contractValue"
-            type="number"
-            min="0"
-            value={formData.contractValue}
-            onChange={handleChange}
-            style={inputStyle}
-          />
-        </div>
+          <div>
+            <label
+              htmlFor="contractValue"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Contract Value
+            </label>
+            <input
+              id="contractValue"
+              name="contractValue"
+              type="number"
+              min="0"
+              value={formData.contractValue}
+              onChange={handleChange}
+              style={inputStyle}
+            />
+          </div>
 
-        <div>
-          <label
-            htmlFor="status"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Status
-          </label>
-          <select
-            id="status"
-            name="status"
-            value={formData.status}
-            onChange={handleChange}
-            required
-            style={inputStyle}
-          >
-            <option value="active">Active</option>
-            <option value="expired">Expired</option>
-            <option value="terminated">Terminated</option>
-            <option value="pending_renewal">Pending Renewal</option>
-          </select>
-        </div>
+          <div>
+            <label
+              htmlFor="status"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Status
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            >
+              <option value="active">Active</option>
+              <option value="expired">Expired</option>
+              <option value="terminated">Terminated</option>
+              <option value="pending_renewal">Pending Renewal</option>
+            </select>
+          </div>
 
-        <div style={{ gridColumn: "1 / -1" }}>
-          <label
-            htmlFor="notes"
-            style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
-          >
-            Notes
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            rows="4"
-            style={{ ...inputStyle, resize: "vertical" }}
-          />
-        </div>
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label
+              htmlFor="notes"
+              style={{ display: "block", marginBottom: "8px", fontWeight: "600" }}
+            >
+              Notes
+            </label>
+            <textarea
+              id="notes"
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
+              rows="4"
+              style={{ ...inputStyle, resize: "vertical" }}
+            />
+          </div>
 
-        <div style={{ gridColumn: "1 / -1" }}>
-          <button
-            type="submit"
-            disabled={submitting}
-            style={{
-              padding: "12px 18px",
-              border: "none",
-              borderRadius: "10px",
-              background: "#0b1f3a",
-              color: "#ffffff",
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.7 : 1,
-            }}
-          >
-            {submitting
-              ? editingContractId
-                ? "Updating..."
-                : "Creating..."
-              : editingContractId
-              ? "Update Contract"
-              : "Create Contract"}
-          </button>
-
-          {editingContractId ? (
+          <div style={{ gridColumn: "1 / -1" }}>
             <button
-              type="button"
-              onClick={resetForm}
+              type="submit"
+              disabled={submitting}
               style={{
-                marginLeft: "12px",
                 padding: "12px 18px",
-                border: "1px solid #d9e2ec",
+                border: "none",
                 borderRadius: "10px",
-                background: "#ffffff",
-                color: "#14213d",
-                cursor: "pointer",
+                background: "#0b1f3a",
+                color: "#ffffff",
+                cursor: submitting ? "not-allowed" : "pointer",
+                opacity: submitting ? 0.7 : 1,
               }}
             >
-              Cancel Edit
+              {submitting
+                ? editingContractId
+                  ? "Updating..."
+                  : "Creating..."
+                : editingContractId
+                ? "Update Contract"
+                : "Create Contract"}
             </button>
-          ) : null}
-        </div>
+
+            {editingContractId ? (
+              <button
+                type="button"
+                onClick={resetForm}
+                style={{
+                  marginLeft: "12px",
+                  padding: "12px 18px",
+                  border: "1px solid #d9e2ec",
+                  borderRadius: "10px",
+                  background: "#ffffff",
+                  color: "#14213d",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel Edit
+              </button>
+            ) : null}
+          </div>
         </form>
       ) : null}
 
@@ -808,6 +814,7 @@ function Contracts() {
                 "End Date",
                 "Payment Terms",
                 "Contract Value",
+                "Financial Summary",
                 "Status",
                 "Notes",
                 ...(isAdmin ? ["Actions"] : []),
@@ -860,16 +867,8 @@ function Contracts() {
                       {contract.contractTitle || "-"}
                     </span>
                   </td>
-                  <td style={cellStyle}>
-                    {contract.startDate
-                      ? new Date(contract.startDate).toLocaleDateString()
-                      : "-"}
-                  </td>
-                  <td style={cellStyle}>
-                    {contract.endDate
-                      ? new Date(contract.endDate).toLocaleDateString()
-                      : "-"}
-                  </td>
+                  <td style={cellStyle}>{formatContractDate(contract.startDate)}</td>
+                  <td style={cellStyle}>{formatContractDate(contract.endDate)}</td>
                   <td
                     style={cellStyle}
                     className="contract-payment-terms-cell"
@@ -879,8 +878,13 @@ function Contracts() {
                       {contract.paymentTerms || "-"}
                     </span>
                   </td>
-                  <td style={cellStyle}>{contract.contractValue}</td>
-                  <td style={cellStyle}>{contract.status}</td>
+                  <td style={cellStyle}>
+                    {currencyFormatter.format(Number(contract.contractValue) || 0)}
+                  </td>
+                  <td style={cellStyle}>
+                    {renderFinancialSummary(contract.financialSummary)}
+                  </td>
+                  <td style={cellStyle}>{formatContractStatusLabel(contract.status)}</td>
                   <td
                     style={cellStyle}
                     className="contract-notes-cell"
@@ -922,7 +926,7 @@ function Contracts() {
             ) : (
               <tr>
                 <td
-                  colSpan={isAdmin ? "9" : "8"}
+                  colSpan={isAdmin ? "10" : "9"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
@@ -939,6 +943,72 @@ function Contracts() {
         </table>
       </div>
     </section>
+  );
+}
+
+function renderFinancialSummary(summary) {
+  const safeSummary = summary || {};
+  const contractPaymentsPaid =
+    Number(safeSummary.contractPaymentsPaid || safeSummary.totalPaid) || 0;
+  const pendingContractPayments =
+    Number(safeSummary.pendingContractPayments || safeSummary.pendingAmount) || 0;
+  const outstandingBalance = Number(safeSummary.outstandingBalance) || 0;
+  const reimbursementsPaid = Number(safeSummary.reimbursementsPaid) || 0;
+  const overpaidAmount = Number(safeSummary.overpaidAmount) || 0;
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        gap: "6px",
+        minWidth: "220px",
+      }}
+    >
+      <SummaryField
+        label="Paid Toward Contract"
+        value={currencyFormatter.format(contractPaymentsPaid)}
+      />
+      <SummaryField
+        label="Pending Contract Payments"
+        value={currencyFormatter.format(pendingContractPayments)}
+      />
+      <SummaryField
+        label="Outstanding Balance"
+        value={currencyFormatter.format(outstandingBalance)}
+      />
+      <SummaryField
+        label="Reimbursements Paid"
+        value={currencyFormatter.format(reimbursementsPaid)}
+      />
+      <SummaryField
+        label="Payment Progress"
+        value={
+          overpaidAmount > 0
+            ? `Overpaid by ${currencyFormatter.format(overpaidAmount)}`
+            : outstandingBalance === 0 && contractPaymentsPaid > 0
+            ? "Fully Paid"
+            : "In Progress"
+        }
+      />
+    </div>
+  );
+}
+
+function SummaryField({ label, value }) {
+  return (
+    <div>
+      <span
+        style={{
+          display: "block",
+          marginBottom: "4px",
+          fontSize: "0.8rem",
+          color: "#6b7a90",
+        }}
+      >
+        {label}
+      </span>
+      <strong style={{ color: "#14213d" }}>{value}</strong>
+    </div>
   );
 }
 

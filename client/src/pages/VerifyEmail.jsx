@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../services/api";
+import AuthBranding from "../components/AuthBranding";
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
@@ -45,9 +46,10 @@ function VerifyEmail() {
   return (
     <div className="auth-page">
       <div className="auth-card" style={{ maxWidth: "520px" }}>
-        <h1 style={{ marginBottom: "8px" }}>Verify Email</h1>
+        <AuthBranding subtitle="Estate Service Provider & Contractor Management System" />
         <p style={{ marginBottom: "24px", color: "#6b7a90" }}>
-          Confirm your email address to finish setting up your account.
+          Confirm your email address to finish setting up your EstateHub
+          account.
         </p>
 
         {status === "verifying" ? (

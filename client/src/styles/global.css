@@ -97,11 +97,15 @@ button:hover {
 .sidebar {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
+  min-height: 0;
   padding: 22px;
   background: linear-gradient(180deg, #081b34 0%, #0b2447 100%);
   color: #ffffff;
   box-shadow: var(--shadow-panel);
+  overflow: hidden;
   z-index: 10;
 }
 
@@ -109,7 +113,8 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 24px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   padding: 24px 20px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 28px;
@@ -117,6 +122,27 @@ button:hover {
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
     rgba(7, 19, 38, 0.34);
   backdrop-filter: blur(14px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+.sidebar-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.sidebar-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .brand {
@@ -149,6 +175,13 @@ button:hover {
   font-size: 1rem;
   font-weight: 800;
   box-shadow: 0 14px 24px rgba(245, 158, 11, 0.25);
+}
+
+.brand-mark img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .sidebar-nav {
@@ -210,6 +243,7 @@ button:hover {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 
 .sidebar-footer-label {
@@ -334,6 +368,37 @@ button:hover {
 
 .auth-card-register {
   max-width: 560px;
+}
+
+.auth-branding {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.auth-branding-logo {
+  display: block;
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+}
+
+.auth-branding-copy {
+  min-width: 0;
+}
+
+.auth-branding-title {
+  margin-bottom: 6px;
+  font-size: 1.55rem;
+  font-weight: 760;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+}
+
+.auth-branding-subtitle {
+  color: #6b7a90;
 }
 
 .main-content {
@@ -2004,6 +2069,97 @@ button:hover {
   gap: 20px;
 }
 
+.payments-form {
+  position: relative;
+}
+
+.payments-form-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payments-form-title {
+  font-size: 1.2rem;
+  font-weight: 720;
+  color: var(--text-main);
+}
+
+.payments-form-subtitle {
+  color: var(--text-muted) !important;
+}
+
+.payments-form-alert {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 14px;
+  background: rgba(254, 242, 242, 0.92);
+  color: var(--danger-text);
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.payments-toast {
+  position: fixed;
+  top: 88px;
+  right: 24px;
+  z-index: 80;
+  width: min(400px, calc(100vw - 32px));
+}
+
+.payments-toast-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 44px rgba(15, 23, 42, 0.18);
+}
+
+.payments-toast-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.payments-toast-title {
+  color: var(--text-main);
+  font-size: 0.98rem;
+}
+
+.payments-toast-message {
+  color: var(--danger-text);
+  font-size: 0.94rem;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.payments-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.payments-toast-close:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
 .provider-payment-empty {
   text-align: left;
 }
@@ -3348,6 +3504,17 @@ button:hover {
     display: none;
   }
 
+  .payments-toast {
+    top: 76px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+
+  .payments-toast-content {
+    padding: 14px 16px;
+  }
+
   .provider-payments-card-list {
     display: grid;
   }
@@ -3492,6 +3659,19 @@ button:hover {
 
   .auth-card {
     padding: 24px 20px;
+  }
+
+  .auth-branding {
+    align-items: flex-start;
+  }
+
+  .auth-branding-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .auth-branding-title {
+    font-size: 1.4rem;
   }
 
   .provider-filters {

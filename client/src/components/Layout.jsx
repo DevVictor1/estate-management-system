@@ -9,6 +9,7 @@ import {
 } from "react-icons/fa6";
 import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
+import estateHubIcon from "../assets/branding/estatehub-icon.png";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: FaGaugeHigh },
@@ -68,9 +69,11 @@ function Layout() {
       <aside className="sidebar">
         <div className="sidebar-panel">
           <div className="brand">
-            <span className="brand-mark">EMS</span>
+            <span className="brand-mark">
+              <img src={estateHubIcon} alt="EstateHub icon" />
+            </span>
             <div>
-              <h1>Estate Manager</h1>
+              <h1>EstateHub</h1>
               <p>Operations Portal</p>
             </div>
           </div>
@@ -98,7 +101,7 @@ function Layout() {
 
           <div className="sidebar-footer">
             <p className="sidebar-footer-label">Workspace</p>
-            <h2>Estate Services Dashboard</h2>
+            <h2>EstateHub Dashboard</h2>
             <p className="sidebar-footer-text">
               Track providers, complaints, contracts, and payments from one
               place.
