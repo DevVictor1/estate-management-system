@@ -46,6 +46,10 @@ const getTaskQueryForUser = async (user) => {
     return {};
   }
 
+  if (user?.role === "resident") {
+    return {};
+  }
+
   if (user?.role === "service_provider") {
     return buildProviderTaskQuery(user);
   }
