@@ -1376,6 +1376,21 @@ button:hover {
   backdrop-filter: none !important;
 }
 
+.quotation-contract-inner {
+  width: 100%;
+  padding: 30px 36px 32px;
+  box-sizing: border-box;
+}
+
+.quotation-contract-panel .quotation-contract-grid {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
 .quotation-form-header,
 .quotation-detail-header,
 .quotation-review-header,
@@ -1662,6 +1677,10 @@ button:hover {
 .quotation-review-panel,
 .quotation-contract-panel {
   margin-bottom: 18px;
+}
+
+.quotation-contract-panel {
+  padding: 0;
 }
 
 .quotation-history-section {
@@ -3886,6 +3905,10 @@ button:hover {
     padding: 28px 30px 30px;
   }
 
+  .quotation-contract-inner {
+    padding: 28px 30px 30px;
+  }
+
   .service-providers-page .provider-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -4035,6 +4058,10 @@ button:hover {
   }
 
   .quotation-form-inner {
+    padding: 20px 20px 22px;
+  }
+
+  .quotation-contract-inner {
     padding: 20px 20px 22px;
   }
 

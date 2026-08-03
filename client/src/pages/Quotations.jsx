@@ -1148,117 +1148,119 @@ function Quotations() {
 
             {isAdmin && selectedQuotation.status === "approved" ? (
               <div className="quotation-contract-panel">
-                <div className="quotation-review-header">
-                  <h3>Create Contract from Approved Quotation</h3>
-                  <p>
-                    This creates a contract only after explicit admin confirmation.
-                    Payments are not created automatically.
-                  </p>
-                </div>
-
-                {selectedQuotation.createdContract ? (
-                  <div className="quotation-existing-contract">
-                    <strong>Contract created:</strong>{" "}
-                    {selectedQuotation.createdContract.contractTitle ||
-                      "Contract available"}
+                <div className="quotation-contract-inner">
+                  <div className="quotation-review-header">
+                    <h3>Create Contract from Approved Quotation</h3>
+                    <p>
+                      This creates a contract only after explicit admin confirmation.
+                      Payments are not created automatically.
+                    </p>
                   </div>
-                ) : (
-                  <form
-                    className="quotation-contract-grid"
-                    onSubmit={handleCreateContractFromQuotation}
-                  >
-                    <div className="quotation-form-group">
-                      <label htmlFor="contractTitle">Contract Title</label>
-                      <input
-                        id="contractTitle"
-                        name="contractTitle"
-                        value={contractForm.contractTitle}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control"
-                        required
-                      />
-                    </div>
 
-                    <div className="quotation-form-group">
-                      <label htmlFor="startDate">Start Date</label>
-                      <input
-                        id="startDate"
-                        name="startDate"
-                        type="date"
-                        value={contractForm.startDate}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control"
-                        required
-                      />
+                  {selectedQuotation.createdContract ? (
+                    <div className="quotation-existing-contract">
+                      <strong>Contract created:</strong>{" "}
+                      {selectedQuotation.createdContract.contractTitle ||
+                        "Contract available"}
                     </div>
+                  ) : (
+                    <form
+                      className="quotation-contract-grid"
+                      onSubmit={handleCreateContractFromQuotation}
+                    >
+                      <div className="quotation-form-group">
+                        <label htmlFor="contractTitle">Contract Title</label>
+                        <input
+                          id="contractTitle"
+                          name="contractTitle"
+                          value={contractForm.contractTitle}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control"
+                          required
+                        />
+                      </div>
 
-                    <div className="quotation-form-group">
-                      <label htmlFor="endDate">End Date</label>
-                      <input
-                        id="endDate"
-                        name="endDate"
-                        type="date"
-                        value={contractForm.endDate}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control"
-                        required
-                      />
-                    </div>
+                      <div className="quotation-form-group">
+                        <label htmlFor="startDate">Start Date</label>
+                        <input
+                          id="startDate"
+                          name="startDate"
+                          type="date"
+                          value={contractForm.startDate}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control"
+                          required
+                        />
+                      </div>
 
-                    <div className="quotation-form-group">
-                      <label htmlFor="contractStatus">Contract Status</label>
-                      <select
-                        id="contractStatus"
-                        name="status"
-                        value={contractForm.status}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control"
-                      >
-                        <option value="active">Active</option>
-                        <option value="expired">Expired</option>
-                        <option value="terminated">Terminated</option>
-                        <option value="pending_renewal">Pending Renewal</option>
-                      </select>
-                    </div>
+                      <div className="quotation-form-group">
+                        <label htmlFor="endDate">End Date</label>
+                        <input
+                          id="endDate"
+                          name="endDate"
+                          type="date"
+                          value={contractForm.endDate}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control"
+                          required
+                        />
+                      </div>
 
-                    <div className="quotation-form-group quotation-form-group-wide">
-                      <label htmlFor="paymentTerms">Payment Terms</label>
-                      <textarea
-                        id="paymentTerms"
-                        name="paymentTerms"
-                        rows="3"
-                        value={contractForm.paymentTerms}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control quotation-form-textarea"
-                        required
-                      />
-                    </div>
+                      <div className="quotation-form-group">
+                        <label htmlFor="contractStatus">Contract Status</label>
+                        <select
+                          id="contractStatus"
+                          name="status"
+                          value={contractForm.status}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control"
+                        >
+                          <option value="active">Active</option>
+                          <option value="expired">Expired</option>
+                          <option value="terminated">Terminated</option>
+                          <option value="pending_renewal">Pending Renewal</option>
+                        </select>
+                      </div>
 
-                    <div className="quotation-form-group quotation-form-group-wide">
-                      <label htmlFor="contractNotes">Additional Notes</label>
-                      <textarea
-                        id="contractNotes"
-                        name="notes"
-                        rows="3"
-                        value={contractForm.notes}
-                        onChange={handleContractFieldChange}
-                        className="quotation-form-control quotation-form-textarea"
-                      />
-                    </div>
+                      <div className="quotation-form-group quotation-form-group-wide">
+                        <label htmlFor="paymentTerms">Payment Terms</label>
+                        <textarea
+                          id="paymentTerms"
+                          name="paymentTerms"
+                          rows="3"
+                          value={contractForm.paymentTerms}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control quotation-form-textarea"
+                          required
+                        />
+                      </div>
 
-                    <div className="quotation-form-actions quotation-form-group-wide">
-                      <button
-                        type="submit"
-                        className="quotation-primary-button"
-                        disabled={creatingContract}
-                      >
-                        {creatingContract
-                          ? "Creating Contract..."
-                          : "Create Contract"}
-                      </button>
-                    </div>
-                  </form>
-                )}
+                      <div className="quotation-form-group quotation-form-group-wide">
+                        <label htmlFor="contractNotes">Additional Notes</label>
+                        <textarea
+                          id="contractNotes"
+                          name="notes"
+                          rows="3"
+                          value={contractForm.notes}
+                          onChange={handleContractFieldChange}
+                          className="quotation-form-control quotation-form-textarea"
+                        />
+                      </div>
+
+                      <div className="quotation-form-actions quotation-form-group-wide">
+                        <button
+                          type="submit"
+                          className="quotation-primary-button"
+                          disabled={creatingContract}
+                        >
+                          {creatingContract
+                            ? "Creating Contract..."
+                            : "Create Contract"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
               </div>
             ) : null}
           </>
