@@ -1,19 +1,26 @@
 const fs = require("fs");
 const path = require("path");
 
-let cachedFullLogoDataUri = null;
+const EMAIL_BRAND_LOGO_CID = "estatehub-logo";
+
+let cachedFullLogoAttachment = null;
 let logoWarningLogged = false;
 
-const getFullLogoDataUri = () => {
-  if (cachedFullLogoDataUri) {
-    return cachedFullLogoDataUri;
+const getEmailBrandLogoAttachment = () => {
+  if (cachedFullLogoAttachment) {
+    return cachedFullLogoAttachment;
   }
 
   try {
     const logoPath = path.resolve(__dirname, "../assets/branding/estatehub-logo.png");
     const logoBuffer = fs.readFileSync(logoPath);
-    cachedFullLogoDataUri = `data:image/png;base64,${logoBuffer.toString("base64")}`;
-    return cachedFullLogoDataUri;
+    cachedFullLogoAttachment = {
+      filename: "estatehub-logo.png",
+      content: logoBuffer,
+      contentType: "image/png",
+      contentId: EMAIL_BRAND_LOGO_CID,
+    };
+    return cachedFullLogoAttachment;
   } catch (error) {
     if (!logoWarningLogged) {
       logoWarningLogged = true;
@@ -26,12 +33,12 @@ const getFullLogoDataUri = () => {
 };
 
 const buildEmailBrandHeader = (subtitle) => {
-  const logoDataUri = getFullLogoDataUri();
+  const logoAttachment = getEmailBrandLogoAttachment();
   const safeSubtitle = String(subtitle || "");
-  const logoMarkup = logoDataUri
+  const logoMarkup = logoAttachment
     ? `
             <img
-              src="${logoDataUri}"
+              src="cid:${EMAIL_BRAND_LOGO_CID}"
               alt="EstateHub logo"
               style="display: block; width: 100%; max-width: 220px; height: auto;"
             />
@@ -48,4 +55,6 @@ const buildEmailBrandHeader = (subtitle) => {
 
 module.exports = {
   buildEmailBrandHeader,
+  getEmailBrandLogoAttachment,
+  EMAIL_BRAND_LOGO_CID,
 };

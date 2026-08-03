@@ -1,9 +1,13 @@
 const { getResendClient, getEmailConfig } = require("../config/email");
+const {
+  getEmailBrandLogoAttachment,
+  EMAIL_BRAND_LOGO_CID,
+} = require("../emailTemplates/brandAssets");
 
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-const sendEmail = async ({ to, subject, html, text, replyTo }) => {
+const sendEmail = async ({ to, subject, html, text, replyTo, attachments }) => {
   const emailConfig = getEmailConfig();
   const resendClient = getResendClient();
 
@@ -55,6 +59,24 @@ const sendEmail = async ({ to, subject, html, text, replyTo }) => {
   }
 
   try {
+    const emailAttachments = Array.isArray(attachments)
+      ? attachments.filter(Boolean)
+      : [];
+    const shouldAttachBrandLogo =
+      typeof html === "string" && html.includes(`cid:${EMAIL_BRAND_LOGO_CID}`);
+    const brandLogoAttachment = shouldAttachBrandLogo
+      ? getEmailBrandLogoAttachment()
+      : null;
+    const mergedAttachments = brandLogoAttachment
+      ? [
+          brandLogoAttachment,
+          ...emailAttachments.filter(
+            (attachment) =>
+              attachment?.contentId !== EMAIL_BRAND_LOGO_CID &&
+              attachment?.content_id !== EMAIL_BRAND_LOGO_CID
+          ),
+        ]
+      : emailAttachments;
     const payload = {
       from: emailConfig.emailFrom,
       to: recipients,
@@ -71,6 +93,10 @@ const sendEmail = async ({ to, subject, html, text, replyTo }) => {
 
     if (replyTo) {
       payload.replyTo = replyTo;
+    }
+
+    if (mergedAttachments.length) {
+      payload.attachments = mergedAttachments;
     }
 
     const response = await resendClient.emails.send(payload);
