@@ -38,6 +38,10 @@ const paymentPopulate = [
   },
 ];
 
+const ADMIN_PAYMENT_STATUS_TRANSITIONS = {
+  pending: ["paid", "cancelled"],
+};
+
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
@@ -87,6 +91,8 @@ const buildValidationError = (message, statusCode = 400) => {
   error.statusCode = statusCode;
   return error;
 };
+
+const normalizePaymentStatus = (value = "") => String(value || "").trim().toLowerCase();
 
 const parsePositiveAmount = (value) => {
   const amount = Number(value);
@@ -269,6 +275,10 @@ const sendPaymentNotification = async ({
   payment,
   contract,
   serviceProvider,
+  subject,
+  heading,
+  intro,
+  buttonLabel,
 }) => {
   if (!contract) {
     console.warn(
@@ -311,6 +321,10 @@ const sendPaymentNotification = async ({
     referenceNumber: payment.referenceNumber,
     notes: payment.notes,
     reviewUrl: getPaymentsReviewUrl(),
+    subject,
+    heading,
+    intro,
+    buttonLabel,
   });
 
   const emailResult = await sendEmail({
@@ -325,6 +339,57 @@ const sendPaymentNotification = async ({
   }
 };
 
+const validateAdminPaymentStatusTransition = (currentStatus, nextStatus) => {
+  const safeCurrentStatus = normalizePaymentStatus(currentStatus);
+  const safeNextStatus = normalizePaymentStatus(nextStatus);
+  const allowedTargets = ADMIN_PAYMENT_STATUS_TRANSITIONS[safeCurrentStatus] || [];
+
+  if (!["paid", "cancelled"].includes(safeNextStatus)) {
+    throw buildValidationError(
+      "Invalid payment status update. Allowed values are paid and cancelled."
+    );
+  }
+
+  if (safeCurrentStatus === safeNextStatus) {
+    throw buildValidationError(
+      safeNextStatus === "paid"
+        ? "This payment has already been marked as paid."
+        : "This payment has already been cancelled."
+    );
+  }
+
+  if (!allowedTargets.includes(safeNextStatus)) {
+    throw buildValidationError(
+      "Only pending payments can be marked as paid or cancelled."
+    );
+  }
+
+  return safeNextStatus;
+};
+
+const applyPaymentStatusLifecycle = ({
+  payment,
+  nextStatus,
+  previousStatus,
+  paidAt = new Date(),
+}) => {
+  const safePreviousStatus = normalizePaymentStatus(previousStatus ?? payment.status);
+  const safeNextStatus = normalizePaymentStatus(nextStatus);
+
+  payment.status = safeNextStatus;
+
+  if (safePreviousStatus !== "paid" && safeNextStatus === "paid") {
+    payment.paidAt = paidAt;
+    return { becamePaid: true };
+  }
+
+  if (safeNextStatus !== "paid" && safePreviousStatus !== "paid") {
+    payment.paidAt = undefined;
+  }
+
+  return { becamePaid: false };
+};
+
 const createPayment = async (req, res) => {
   try {
     const payload = buildPaymentPayload(req.body);
@@ -336,6 +401,7 @@ const createPayment = async (req, res) => {
     const payment = await Payment.create({
       ...payload,
       paymentDate: payload.paymentDate || undefined,
+      paidAt: payload.status === "paid" ? new Date() : undefined,
     });
 
     await sendPaymentNotification({ payment, contract, serviceProvider });
@@ -470,12 +536,41 @@ const updatePayment = async (req, res) => {
       existingPaymentId: existingPayment._id,
     });
 
+    const previousStatus = normalizePaymentStatus(existingPayment.status);
+    const requestedStatus = normalizePaymentStatus(payload.status);
+
+    if (previousStatus !== requestedStatus) {
+      validateAdminPaymentStatusTransition(previousStatus, requestedStatus);
+    }
+
     Object.assign(existingPayment, {
       ...payload,
       paymentDate: payload.paymentDate || existingPayment.paymentDate,
     });
 
+    applyPaymentStatusLifecycle({
+      payment: existingPayment,
+      nextStatus: requestedStatus,
+      previousStatus,
+    });
+
     await existingPayment.save();
+
+    if (previousStatus !== "paid" && requestedStatus === "paid") {
+      try {
+        await sendPaymentNotification({
+          payment: existingPayment,
+          contract,
+          serviceProvider,
+          subject: `Payment Confirmed: ${contract.contractTitle || "Untitled contract"}`,
+          heading: "A payment has been confirmed as paid.",
+          intro: "Log in to EstateHub to review your updated payment history.",
+          buttonLabel: "View Payments",
+        });
+      } catch (emailError) {
+        console.warn("Payment updated, but provider payment confirmation email failed.");
+      }
+    }
 
     const populatedPayment = await populatePaymentRecord(existingPayment._id);
 
@@ -494,6 +589,101 @@ const updatePayment = async (req, res) => {
       success: false,
       message:
         statusCode >= 500 ? "Failed to update payment" : error.message,
+    });
+  }
+};
+
+const updatePaymentStatus = async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const requestedStatus = normalizePaymentStatus(req.body?.status);
+    const nextStatus = validateAdminPaymentStatusTransition(
+      payment.status,
+      requestedStatus
+    );
+
+    const { contract, serviceProvider } = await getValidatedPaymentContext({
+      contract: payment.contract,
+      serviceProvider: payment.serviceProvider,
+    });
+
+    if (nextStatus === "paid") {
+      await validateContractPaymentLimits({
+        payload: {
+          amount: payment.amount,
+          paymentType: payment.paymentType || "final",
+          status: "paid",
+        },
+        contract,
+        existingPaymentId: payment._id,
+      });
+    }
+
+    const previousStatus = normalizePaymentStatus(payment.status);
+
+    applyPaymentStatusLifecycle({
+      payment,
+      nextStatus,
+      previousStatus,
+      paidAt: new Date(),
+    });
+
+    await payment.save();
+
+    if (nextStatus === "paid") {
+      try {
+        await sendPaymentNotification({
+          payment,
+          contract,
+          serviceProvider,
+          subject: `Payment Confirmed: ${contract.contractTitle || "Untitled contract"}`,
+          heading: "A payment has been confirmed as paid.",
+          intro: "Log in to EstateHub to review your updated payment history.",
+          buttonLabel: "View Payments",
+        });
+      } catch (emailError) {
+        console.warn("Payment status updated, but provider payment confirmation email failed.");
+      }
+    }
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    res.status(200).json({
+      success: true,
+      message:
+        nextStatus === "paid"
+          ? "Payment marked as paid successfully."
+          : "Payment cancelled successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to update payment status"
+          : error.message,
     });
   }
 };
@@ -526,5 +716,6 @@ module.exports = {
   getPayments,
   getPaymentById,
   updatePayment,
+  updatePaymentStatus,
   deletePayment,
 };

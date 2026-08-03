@@ -75,9 +75,14 @@ function Payments() {
   const [maxAmountFilter, setMaxAmountFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState({
+    paymentId: "",
+    status: "",
+  });
   const [pageError, setPageError] = useState("");
   const [formError, setFormError] = useState("");
   const [warning, setWarning] = useState("");
+  const [feedback, setFeedback] = useState("");
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
   const isAdmin = user?.role === "admin";
@@ -98,10 +103,10 @@ function Payments() {
     setToast(null);
   };
 
-  const showToast = (message) => {
+  const showToast = (title, message) => {
     dismissToast();
     setToast({
-      title: "Payment could not be saved",
+      title,
       message,
     });
     toastTimerRef.current = setTimeout(() => {
@@ -117,6 +122,7 @@ function Payments() {
       contract: contracts[0]?._id || "",
     });
     setEditingPaymentId("");
+    setFeedback("");
   };
 
   useEffect(() => {
@@ -139,6 +145,7 @@ function Payments() {
   const fetchPageData = async () => {
     try {
       setPageError("");
+      setFeedback("");
 
       if (isAdmin) {
         const [paymentsResponse, providersResponse, contractsResponse] =
@@ -207,6 +214,7 @@ function Payments() {
     setPageError("");
     setFormError("");
     setWarning("");
+    setFeedback("");
     dismissToast();
     setEditingPaymentId(payment._id);
     setFormData({
@@ -283,6 +291,7 @@ function Payments() {
       setPageError("");
       setWarning("");
       setFormError("");
+      setFeedback("");
       dismissToast();
       await api.delete(`/api/payments/${paymentId}`);
 
@@ -296,11 +305,68 @@ function Payments() {
     }
   };
 
+  const handleStatusUpdate = async (payment, nextStatus) => {
+    const actionLabel =
+      nextStatus === "paid"
+        ? "mark this payment as paid"
+        : "cancel this pending payment";
+    const confirmed = window.confirm(
+      `Are you sure you want to ${actionLabel}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setStatusUpdating({
+      paymentId: payment._id,
+      status: nextStatus,
+    });
+    setPageError("");
+    setFormError("");
+    setWarning("");
+    setFeedback("");
+    dismissToast();
+
+    try {
+      const response = await api.patch(`/api/payments/${payment._id}/status`, {
+        status: nextStatus,
+      });
+
+      if (editingPaymentId === payment._id) {
+        setFormData((currentData) => ({
+          ...currentData,
+          status: response.data?.data?.status || nextStatus,
+        }));
+      }
+
+      await fetchPageData();
+      setFeedback(
+        nextStatus === "paid"
+          ? "Payment marked as paid successfully."
+          : "Pending payment cancelled successfully."
+      );
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to update payment status."
+      );
+      setPageError(message);
+      showToast("Payment status could not be updated", message);
+    } finally {
+      setStatusUpdating({
+        paymentId: "",
+        status: "",
+      });
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
     setFormError("");
     setWarning("");
+    setFeedback("");
     dismissToast();
 
     try {
@@ -316,8 +382,11 @@ function Payments() {
 
       const warnings = response.data?.warnings || [];
 
-      resetForm();
       await fetchPageData();
+      resetForm();
+      setFeedback(
+        editingPaymentId ? "Payment updated successfully." : "Payment created successfully."
+      );
 
       if (warnings.length) {
         setWarning(warnings.join(" "));
@@ -328,7 +397,7 @@ function Payments() {
         `Failed to ${editingPaymentId ? "update" : "create"} payment.`
       );
       setFormError(message);
-      showToast(message);
+      showToast("Payment could not be saved", message);
     } finally {
       setSubmitting(false);
     }
@@ -584,6 +653,11 @@ function Payments() {
 
       {pageError ? (
         <p style={{ marginBottom: "16px", color: "#c1121f" }}>{pageError}</p>
+      ) : null}
+      {feedback ? (
+        <p className="payments-feedback payments-feedback-success" role="status">
+          {feedback}
+        </p>
       ) : null}
       {warning ? (
         <p style={{ marginBottom: "16px", color: "#9a6700" }}>{warning}</p>
@@ -1096,8 +1170,52 @@ function Payments() {
                   <td style={cellStyle}>{payment.referenceNumber || "-"}</td>
                   <td style={cellStyle}>{payment.notes || "-"}</td>
                   {isAdmin ? (
-                    <td style={cellStyle}>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <td style={paymentActionsCellStyle}>
+                      <div className="payments-action-row">
+                        {payment.status === "pending" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusUpdate(payment, "paid")}
+                            style={{
+                              ...actionButtonStyle,
+                              ...actionButtonToneStyles.success,
+                              opacity:
+                                statusUpdating.paymentId === payment._id ? 0.7 : 1,
+                              cursor:
+                                statusUpdating.paymentId === payment._id
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                            disabled={statusUpdating.paymentId === payment._id}
+                          >
+                            {statusUpdating.paymentId === payment._id &&
+                            statusUpdating.status === "paid"
+                              ? "Updating..."
+                              : "Mark Paid"}
+                          </button>
+                        ) : null}
+                        {payment.status === "pending" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStatusUpdate(payment, "cancelled")}
+                            style={{
+                              ...actionButtonStyle,
+                              ...actionButtonToneStyles.neutral,
+                              opacity:
+                                statusUpdating.paymentId === payment._id ? 0.7 : 1,
+                              cursor:
+                                statusUpdating.paymentId === payment._id
+                                  ? "not-allowed"
+                                  : "pointer",
+                            }}
+                            disabled={statusUpdating.paymentId === payment._id}
+                          >
+                            {statusUpdating.paymentId === payment._id &&
+                            statusUpdating.status === "cancelled"
+                              ? "Updating..."
+                              : "Cancel"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => handleEdit(payment)}
@@ -1110,9 +1228,7 @@ function Payments() {
                           onClick={() => handleDelete(payment._id)}
                           style={{
                             ...actionButtonStyle,
-                            background: "#c1121f",
-                            color: "#ffffff",
-                            borderColor: "#c1121f",
+                            ...actionButtonToneStyles.danger,
                           }}
                         >
                           Delete
@@ -1177,6 +1293,12 @@ const cellStyle = {
   verticalAlign: "top",
 };
 
+const paymentActionsCellStyle = {
+  ...cellStyle,
+  minWidth: "360px",
+  whiteSpace: "nowrap",
+};
+
 const actionButtonStyle = {
   padding: "8px 12px",
   border: "1px solid #d9e2ec",
@@ -1184,6 +1306,24 @@ const actionButtonStyle = {
   background: "#ffffff",
   color: "#14213d",
   cursor: "pointer",
+};
+
+const actionButtonToneStyles = {
+  success: {
+    background: "#dcfce7",
+    color: "#166534",
+    borderColor: "rgba(22, 101, 52, 0.18)",
+  },
+  neutral: {
+    background: "#f8fafc",
+    color: "#374151",
+    borderColor: "rgba(148, 163, 184, 0.22)",
+  },
+  danger: {
+    background: "#c1121f",
+    color: "#ffffff",
+    borderColor: "#c1121f",
+  },
 };
 
 const statusBadgeStyles = {

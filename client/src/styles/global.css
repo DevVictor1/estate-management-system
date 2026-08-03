@@ -2595,6 +2595,27 @@ button:hover {
   word-break: break-word;
 }
 
+.payments-feedback {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.payments-feedback-success {
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  background: rgba(220, 252, 231, 0.92);
+  color: var(--success-text);
+}
+
+.payments-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
 .payments-toast {
   position: fixed;
   top: 88px;

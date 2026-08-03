@@ -48,6 +48,10 @@ const buildPaymentRecordedEmail = ({
   referenceNumber,
   notes,
   reviewUrl,
+  subject,
+  heading,
+  intro,
+  buttonLabel,
 }) => {
   const safeCompanyName = escapeHtml(companyName || "Not provided");
   const safeContractTitle = escapeHtml(contractTitle || "Untitled contract");
@@ -124,22 +128,30 @@ const buildPaymentRecordedEmail = ({
           href="${safeReviewUrl}"
           style="display: inline-block; padding: 12px 18px; border-radius: 10px; background: #0b1f3a; color: #ffffff; text-decoration: none; font-weight: 700;"
         >
-          Review Payments
+          ${escapeHtml(buttonLabel || "Review Payments")}
         </a>
       </div>
     `
     : "";
 
+  const safeHeading = escapeHtml(
+    heading || "A payment has been recorded for your contract."
+  );
+  const safeIntro = escapeHtml(
+    intro || "Log in to EstateHub to review your payment history."
+  );
+  const safeSubject = subject || `Payment Recorded: ${contractTitle || "Untitled contract"}`;
+
   return {
-    subject: `Payment Recorded: ${contractTitle || "Untitled contract"}`,
+    subject: safeSubject,
     html: `
       <div style="font-family: Arial, sans-serif; color: #14213d; line-height: 1.6; padding: 24px;">
         <div style="max-width: 680px; margin: 0 auto; border: 1px solid #d9e2ec; border-radius: 16px; overflow: hidden; background: #ffffff;">
           ${buildEmailBrandHeader("Payment update")}
           <div style="padding: 24px;">
-            <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">A payment has been recorded for your contract.</h2>
+            <h2 style="margin: 0 0 16px; font-size: 20px; color: #14213d;">${safeHeading}</h2>
             <p style="margin: 0 0 20px; color: #64748b;">
-              Log in to EstateHub to review your payment history.
+              ${safeIntro}
             </p>
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
@@ -172,8 +184,8 @@ const buildPaymentRecordedEmail = ({
       "EstateHub",
       "Payment update",
       "",
-      "A payment has been recorded for your contract.",
-      "Log in to EstateHub to review your payment history.",
+      heading || "A payment has been recorded for your contract.",
+      intro || "Log in to EstateHub to review your payment history.",
       "",
       `Company name: ${companyName || "Not provided"}`,
       `Contract title: ${contractTitle || "Untitled contract"}`,

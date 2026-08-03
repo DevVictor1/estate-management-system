@@ -42,6 +42,10 @@ const paymentSchema = new mongoose.Schema(
       default: "pending",
     },
 
+    paidAt: {
+      type: Date,
+    },
+
     referenceNumber: {
       type: String,
       trim: true,
