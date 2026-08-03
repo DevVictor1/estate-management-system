@@ -605,154 +605,156 @@ function Quotations() {
 
       {isServiceProvider ? (
         <section className="quotation-form-card">
-          <div className="quotation-form-header">
-            <div>
-              <h2>Submit a Quotation</h2>
-              <p>
-                Choose one of your assigned tasks that still needs a quotation
-                or has a revision request pending.
-              </p>
+          <div className="quotation-form-inner">
+            <div className="quotation-form-header">
+              <div>
+                <h2>Submit a Quotation</h2>
+                <p>
+                  Choose one of your assigned tasks that still needs a quotation
+                  or has a revision request pending.
+                </p>
+              </div>
+              <div className="quotation-total-pill">
+                <span>Total</span>
+                <strong>{formatCurrency(liveQuotationTotal)}</strong>
+              </div>
             </div>
-            <div className="quotation-total-pill">
-              <span>Total</span>
-              <strong>{formatCurrency(liveQuotationTotal)}</strong>
-            </div>
+
+            {formError ? (
+              <div className="quotation-form-alert" role="alert">
+                {formError}
+              </div>
+            ) : null}
+
+            <form className="quotation-form-grid" onSubmit={handleCreateQuotation}>
+              <div className="quotation-form-group quotation-form-group-wide">
+                <label htmlFor="quotationTask">Task</label>
+                <select
+                  id="quotationTask"
+                  name="task"
+                  value={quotationForm.task}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                  required
+                >
+                  <option value="">Select an assigned task</option>
+                  {eligibleProviderTasks.map((task) => {
+                    const latestQuotation =
+                      task.latestQuotation || latestQuotationByTask.get(task._id);
+                    const suffix =
+                      latestQuotation?.status === "revision_requested"
+                        ? " (Revision requested)"
+                        : "";
+
+                    return (
+                      <option key={task._id} value={task._id}>
+                        {task.title}
+                        {suffix}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div className="quotation-form-group">
+                <label htmlFor="labourCost">Labour Cost</label>
+                <input
+                  id="labourCost"
+                  name="labourCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quotationForm.labourCost}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                  required
+                />
+              </div>
+
+              <div className="quotation-form-group">
+                <label htmlFor="materialsCost">Materials Cost</label>
+                <input
+                  id="materialsCost"
+                  name="materialsCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quotationForm.materialsCost}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                  required
+                />
+              </div>
+
+              <div className="quotation-form-group">
+                <label htmlFor="otherCost">Other Cost</label>
+                <input
+                  id="otherCost"
+                  name="otherCost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={quotationForm.otherCost}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                />
+              </div>
+
+              <div className="quotation-form-group">
+                <label htmlFor="estimatedDurationValue">Estimated Duration</label>
+                <input
+                  id="estimatedDurationValue"
+                  name="estimatedDurationValue"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={quotationForm.estimatedDurationValue}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                  required
+                />
+              </div>
+
+              <div className="quotation-form-group">
+                <label htmlFor="estimatedDurationUnit">Duration Unit</label>
+                <select
+                  id="estimatedDurationUnit"
+                  name="estimatedDurationUnit"
+                  value={quotationForm.estimatedDurationUnit}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control"
+                  required
+                >
+                  <option value="hours">Hours</option>
+                  <option value="days">Days</option>
+                  <option value="weeks">Weeks</option>
+                </select>
+              </div>
+
+              <div className="quotation-form-group quotation-form-group-wide">
+                <label htmlFor="quotationNotes">Notes</label>
+                <textarea
+                  id="quotationNotes"
+                  name="notes"
+                  rows="4"
+                  value={quotationForm.notes}
+                  onChange={handleQuotationFieldChange}
+                  className="quotation-form-control quotation-form-textarea"
+                  placeholder="Add supporting pricing details, scope notes, or material assumptions."
+                />
+              </div>
+
+              <div className="quotation-form-actions quotation-form-group-wide">
+                <button
+                  type="submit"
+                  className="quotation-primary-button"
+                  disabled={submittingQuotation}
+                >
+                  {submittingQuotation ? "Submitting..." : "Submit Quotation"}
+                </button>
+              </div>
+            </form>
           </div>
-
-          {formError ? (
-            <div className="quotation-form-alert" role="alert">
-              {formError}
-            </div>
-          ) : null}
-
-          <form className="quotation-form-grid" onSubmit={handleCreateQuotation}>
-            <div className="quotation-form-group quotation-form-group-wide">
-              <label htmlFor="quotationTask">Task</label>
-              <select
-                id="quotationTask"
-                name="task"
-                value={quotationForm.task}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-                required
-              >
-                <option value="">Select an assigned task</option>
-                {eligibleProviderTasks.map((task) => {
-                  const latestQuotation =
-                    task.latestQuotation || latestQuotationByTask.get(task._id);
-                  const suffix =
-                    latestQuotation?.status === "revision_requested"
-                      ? " (Revision requested)"
-                      : "";
-
-                  return (
-                    <option key={task._id} value={task._id}>
-                      {task.title}
-                      {suffix}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            <div className="quotation-form-group">
-              <label htmlFor="labourCost">Labour Cost</label>
-              <input
-                id="labourCost"
-                name="labourCost"
-                type="number"
-                min="0"
-                step="0.01"
-                value={quotationForm.labourCost}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-                required
-              />
-            </div>
-
-            <div className="quotation-form-group">
-              <label htmlFor="materialsCost">Materials Cost</label>
-              <input
-                id="materialsCost"
-                name="materialsCost"
-                type="number"
-                min="0"
-                step="0.01"
-                value={quotationForm.materialsCost}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-                required
-              />
-            </div>
-
-            <div className="quotation-form-group">
-              <label htmlFor="otherCost">Other Cost</label>
-              <input
-                id="otherCost"
-                name="otherCost"
-                type="number"
-                min="0"
-                step="0.01"
-                value={quotationForm.otherCost}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-              />
-            </div>
-
-            <div className="quotation-form-group">
-              <label htmlFor="estimatedDurationValue">Estimated Duration</label>
-              <input
-                id="estimatedDurationValue"
-                name="estimatedDurationValue"
-                type="number"
-                min="1"
-                step="1"
-                value={quotationForm.estimatedDurationValue}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-                required
-              />
-            </div>
-
-            <div className="quotation-form-group">
-              <label htmlFor="estimatedDurationUnit">Duration Unit</label>
-              <select
-                id="estimatedDurationUnit"
-                name="estimatedDurationUnit"
-                value={quotationForm.estimatedDurationUnit}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control"
-                required
-              >
-                <option value="hours">Hours</option>
-                <option value="days">Days</option>
-                <option value="weeks">Weeks</option>
-              </select>
-            </div>
-
-            <div className="quotation-form-group quotation-form-group-wide">
-              <label htmlFor="quotationNotes">Notes</label>
-              <textarea
-                id="quotationNotes"
-                name="notes"
-                rows="4"
-                value={quotationForm.notes}
-                onChange={handleQuotationFieldChange}
-                className="quotation-form-control quotation-form-textarea"
-                placeholder="Add supporting pricing details, scope notes, or material assumptions."
-              />
-            </div>
-
-            <div className="quotation-form-actions quotation-form-group-wide">
-              <button
-                type="submit"
-                className="quotation-primary-button"
-                disabled={submittingQuotation}
-              >
-                {submittingQuotation ? "Submitting..." : "Submit Quotation"}
-              </button>
-            </div>
-          </form>
         </section>
       ) : null}
 

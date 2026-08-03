@@ -1357,8 +1357,23 @@ button:hover {
 }
 
 .quotation-form-card {
-  padding: 30px 38px 32px;
+  padding: 0;
   box-sizing: border-box;
+}
+
+.quotation-form-inner {
+  width: 100%;
+  padding: 30px 36px 32px;
+  box-sizing: border-box;
+}
+
+.quotation-form-card .quotation-form-grid {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 .quotation-form-header,
@@ -3864,7 +3879,11 @@ button:hover {
   }
 
   .quotation-form-card {
-    padding: 28px 32px 30px;
+    padding: 0;
+  }
+
+  .quotation-form-inner {
+    padding: 28px 30px 30px;
   }
 
   .service-providers-page .provider-form-grid {
@@ -4012,6 +4031,10 @@ button:hover {
   }
 
   .quotation-form-card {
+    padding: 0;
+  }
+
+  .quotation-form-inner {
     padding: 20px 20px 22px;
   }
 
