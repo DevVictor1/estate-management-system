@@ -31,6 +31,18 @@ const initialFilters = {
 
 const quotableTaskStatuses = ["pending", "in_progress", "overdue"];
 
+const getQuotationRevisionKey = (quotation = {}) => {
+  const taskId = quotation.task?._id || quotation.task || "";
+  const serviceProviderId =
+    quotation.serviceProvider?._id || quotation.serviceProvider || "";
+
+  if (!taskId || !serviceProviderId) {
+    return "";
+  }
+
+  return `${taskId}:${serviceProviderId}`;
+};
+
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -270,7 +282,7 @@ function Quotations() {
     };
   }, [selectedQuotationId]);
 
-  const latestQuotationByTask = useMemo(() => {
+  const latestQuotationByTaskProvider = useMemo(() => {
     const sortedQuotations = [...quotations].sort((firstQuotation, secondQuotation) => {
       const firstRevision = Number(firstQuotation.revisionNumber || 0);
       const secondRevision = Number(secondQuotation.revisionNumber || 0);
@@ -286,13 +298,13 @@ function Quotations() {
     });
 
     return sortedQuotations.reduce((map, quotation) => {
-      const taskId = quotation.task?._id || quotation.task;
+      const revisionKey = getQuotationRevisionKey(quotation);
 
-      if (!taskId || map.has(taskId)) {
+      if (!revisionKey || map.has(revisionKey)) {
         return map;
       }
 
-      map.set(taskId, quotation);
+      map.set(revisionKey, quotation);
       return map;
     }, new Map());
   }, [quotations]);
@@ -303,7 +315,12 @@ function Quotations() {
     }
 
     return tasks.filter((task) => {
-      const latestQuotation = task.latestQuotation || latestQuotationByTask.get(task._id);
+      const taskProviderKey = getQuotationRevisionKey({
+        task: task._id,
+        serviceProvider: task.serviceProvider?._id || task.serviceProvider,
+      });
+      const latestQuotation =
+        task.latestQuotation || latestQuotationByTaskProvider.get(taskProviderKey);
       const hasAllowedTaskStatus = quotableTaskStatuses.includes(task.status);
       const hasNoQuotation = !latestQuotation;
       const needsRevision = latestQuotation?.status === "revision_requested";
@@ -315,7 +332,23 @@ function Quotations() {
         (hasNoQuotation || needsRevision)
       );
     });
-  }, [isServiceProvider, latestQuotationByTask, tasks]);
+  }, [isServiceProvider, latestQuotationByTaskProvider, tasks]);
+
+  const revisableQuotationIds = useMemo(() => {
+    if (!isServiceProvider) {
+      return new Set();
+    }
+
+    const quotationIds = new Set();
+
+    latestQuotationByTaskProvider.forEach((quotation) => {
+      if (quotation?.status === "revision_requested" && quotation?._id) {
+        quotationIds.add(String(quotation._id));
+      }
+    });
+
+    return quotationIds;
+  }, [isServiceProvider, latestQuotationByTaskProvider]);
 
   const providerOptions = useMemo(() => {
     const providerMap = new Map();
@@ -409,8 +442,14 @@ function Quotations() {
       setFormError("");
     }
 
-    if (name === "task") {
-      const revisionSource = latestQuotationByTask.get(value);
+      if (name === "task") {
+      const matchedTask = tasks.find((task) => task._id === value);
+      const revisionKey = getQuotationRevisionKey({
+        task: value,
+        serviceProvider:
+          matchedTask?.serviceProvider?._id || matchedTask?.serviceProvider,
+      });
+      const revisionSource = latestQuotationByTaskProvider.get(revisionKey);
 
       if (revisionSource?.status === "revision_requested") {
         applyQuotationPrefill({
@@ -650,7 +689,14 @@ function Quotations() {
                   <option value="">Select an assigned task</option>
                   {eligibleProviderTasks.map((task) => {
                     const latestQuotation =
-                      task.latestQuotation || latestQuotationByTask.get(task._id);
+                      task.latestQuotation ||
+                      latestQuotationByTaskProvider.get(
+                        getQuotationRevisionKey({
+                          task: task._id,
+                          serviceProvider:
+                            task.serviceProvider?._id || task.serviceProvider,
+                        })
+                      );
                     const suffix =
                       latestQuotation?.status === "revision_requested"
                         ? " (Revision requested)"
@@ -931,7 +977,7 @@ function Quotations() {
                           {isAdmin ? "Review" : "View"}
                         </button>
                         {isServiceProvider &&
-                        quotation.status === "revision_requested" ? (
+                        revisableQuotationIds.has(String(quotation._id)) ? (
                           <button
                             type="button"
                             className="quotation-secondary-button"
