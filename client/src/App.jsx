@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import Payments from "./pages/Payments";
+import Quotations from "./pages/Quotations";
 import Register from "./pages/Register";
 import ResetPassword from "./pages/ResetPassword";
 import ServiceProviders from "./pages/ServiceProviders";
@@ -34,6 +35,13 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/service-providers" element={<ServiceProviders />} />
             <Route path="/tasks" element={<Tasks />} />
+            <Route
+              element={
+                <ProtectedRoute allowedRoles={["admin", "service_provider"]} />
+              }
+            >
+              <Route path="/quotations" element={<Quotations />} />
+            </Route>
             <Route
               element={
                 <ProtectedRoute allowedRoles={["admin", "resident"]} />

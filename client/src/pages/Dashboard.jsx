@@ -468,11 +468,35 @@ function Dashboard() {
         icon: FaReceipt,
         helper: "Waiting to be settled",
       },
+      {
+        label: "Pending Quotations",
+        value: Number(analytics?.summaries?.quotations?.pendingReview || 0),
+        tone: "warning",
+        icon: FaReceipt,
+        helper: "Awaiting admin review",
+      },
+      {
+        label: "Revision Requested",
+        value: Number(
+          analytics?.summaries?.quotations?.revisionRequested || 0
+        ),
+        tone: "neutral",
+        icon: FaHourglassHalf,
+        helper: "Waiting on provider updates",
+      },
+      {
+        label: "Approved Quotations",
+        value: Number(analytics?.summaries?.quotations?.approved || 0),
+        tone: "success",
+        icon: FaFileCircleCheck,
+        helper: "Ready for contract creation",
+      },
     ],
-    [adminOverview, stats]
+    [adminOverview, analytics, stats]
   );
 
   const charts = analytics?.charts || initialAnalytics.charts;
+  const quotationSummaries = analytics?.summaries?.quotations || {};
   const totalPaidAmount = currencyFormatter.format(stats.payments.totalPaid || 0);
 
   const adminAttentionItems = [
@@ -935,6 +959,24 @@ function Dashboard() {
                 <span className="dashboard-stat-label">Primary Action</span>
                 <strong className="dashboard-stat-value">
                   Check assigned tasks
+                </strong>
+              </article>
+              <article className="dashboard-stat-card dashboard-stat-neutral">
+                <span className="dashboard-stat-label">Submitted Quotations</span>
+                <strong className="dashboard-stat-value">
+                  {Number(quotationSummaries.submitted || 0)}
+                </strong>
+              </article>
+              <article className="dashboard-stat-card dashboard-stat-warning">
+                <span className="dashboard-stat-label">Revision Requested</span>
+                <strong className="dashboard-stat-value">
+                  {Number(quotationSummaries.revisionRequested || 0)}
+                </strong>
+              </article>
+              <article className="dashboard-stat-card dashboard-stat-success">
+                <span className="dashboard-stat-label">Approved Quotations</span>
+                <strong className="dashboard-stat-value">
+                  {Number(quotationSummaries.approved || 0)}
                 </strong>
               </article>
             </div>

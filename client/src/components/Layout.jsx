@@ -2,6 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import {
   FaClipboardCheck,
   FaFileContract,
+  FaFileInvoiceDollar,
   FaGaugeHigh,
   FaMoneyBillWave,
   FaTriangleExclamation,
@@ -19,6 +20,7 @@ const navItems = [
     icon: FaUsersGear,
   },
   { to: "/tasks", label: "Tasks", icon: FaClipboardCheck },
+  { to: "/quotations", label: "Quotations", icon: FaFileInvoiceDollar },
   {
     to: "/complaints",
     label: "Complaints",
@@ -33,6 +35,10 @@ function Layout() {
   const visibleNavItems = navItems
     .filter((item) => {
       if (user?.role === "service_provider" && item.to === "/complaints") {
+        return false;
+      }
+
+      if (user?.role === "resident" && item.to === "/quotations") {
         return false;
       }
 

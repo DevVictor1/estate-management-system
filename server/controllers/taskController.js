@@ -11,6 +11,10 @@ const { isEmailVerified } = require("../utils/emailVerification");
 const {
   resolveVerifiedUserEmailRecipient,
 } = require("../utils/verifiedRecipients");
+const {
+  attachLatestQuotationSummaryToTasks,
+} = require("../utils/quotationUtils");
+const { getProviderIdsForUser } = require("../utils/paymentFinancials");
 
 const providerAllowedStatuses = ["pending", "in_progress", "completed"];
 const creatableStatuses = ["pending", "in_progress", "overdue", "cancelled"];
@@ -324,11 +328,22 @@ const getTasks = async (req, res) => {
       Task.find(taskQuery).sort({ createdAt: -1 }),
       req.user?.role
     );
+    const includeQuotationSummary =
+      req.user?.role === "admin" || req.user?.role === "service_provider";
+    const providerIds =
+      req.user?.role === "service_provider"
+        ? await getProviderIdsForUser(req.user)
+        : [];
+    const taskData = await attachLatestQuotationSummaryToTasks({
+      tasks,
+      includeSummary: includeQuotationSummary,
+      providerIds,
+    });
 
     res.status(200).json({
       success: true,
-      count: tasks.length,
-      data: tasks,
+      count: taskData.length,
+      data: taskData,
     });
   } catch (error) {
     res.status(500).json({
@@ -362,9 +377,21 @@ const getTaskById = async (req, res) => {
       });
     }
 
+    const includeQuotationSummary =
+      req.user?.role === "admin" || req.user?.role === "service_provider";
+    const providerIds =
+      req.user?.role === "service_provider"
+        ? await getProviderIdsForUser(req.user)
+        : [];
+    const [taskData] = await attachLatestQuotationSummaryToTasks({
+      tasks: [task],
+      includeSummary: includeQuotationSummary,
+      providerIds,
+    });
+
     res.status(200).json({
       success: true,
-      data: task,
+      data: taskData,
     });
   } catch (error) {
     res.status(500).json({

@@ -26,6 +26,19 @@ const initialTaskFilters = {
   statusFilter: "",
 };
 
+const currencyFormatter = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  maximumFractionDigits: 2,
+});
+
+const formatQuotationStatusLabel = (status = "") =>
+  String(status || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 const formatFileSize = (sizeInBytes = 0) => {
   if (!sizeInBytes) {
     return "0 KB";
@@ -1060,6 +1073,26 @@ function Tasks() {
                     <span className="task-description-text">
                       {task.description || "-"}
                     </span>
+                    {!isResident && task.latestQuotation ? (
+                      <div className="task-quotation-summary">
+                        <span className="task-quotation-summary-label">
+                          Latest quotation
+                        </span>
+                        <div className="task-quotation-summary-meta">
+                          <span>
+                            {formatQuotationStatusLabel(task.latestQuotation.status)}
+                          </span>
+                          <span>
+                            {currencyFormatter.format(
+                              Number(task.latestQuotation.totalAmount) || 0
+                            )}
+                          </span>
+                          <span>
+                            Revision {task.latestQuotation.revisionNumber || 1}
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                     {isServiceProvider &&
                     getTaskComplaintAttachments(task).length ? (
                       <div className="task-complaint-attachments">

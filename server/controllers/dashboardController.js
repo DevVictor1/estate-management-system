@@ -3,6 +3,7 @@ const Task = require("../models/Task");
 const Complaint = require("../models/Complaint");
 const Contract = require("../models/Contract");
 const Payment = require("../models/Payment");
+const Quotation = require("../models/Quotation");
 
 const complaintStatuses = [
   "open",
@@ -263,17 +264,32 @@ const getDashboardAnalytics = async (req, res) => {
         tasksByStatusRows,
         complaintsTrend,
         paymentsTrend,
+        pendingQuotations,
+        revisionRequestedQuotations,
+        approvedQuotations,
       ] = await Promise.all([
         aggregateStatusCounts(Complaint, {}, complaintStatuses),
         aggregateStatusCounts(Task, {}, taskStatuses),
         buildMonthlyCountChart(Complaint, {}, "createdAt", "count"),
         buildMonthlyAmountChart(Payment, { status: "paid" }, "paymentDate"),
+        Quotation.countDocuments({
+          status: { $in: ["submitted", "under_review"] },
+        }),
+        Quotation.countDocuments({ status: "revision_requested" }),
+        Quotation.countDocuments({ status: "approved" }),
       ]);
 
       return res.status(200).json({
         success: true,
         data: {
           role: "admin",
+          summaries: {
+            quotations: {
+              pendingReview: pendingQuotations,
+              revisionRequested: revisionRequestedQuotations,
+              approved: approvedQuotations,
+            },
+          },
           charts: {
             complaintsByStatus: buildStatusChartData(
               complaintStatuses,
@@ -303,6 +319,7 @@ const getDashboardAnalytics = async (req, res) => {
         success: true,
         data: {
           role: "resident",
+          summaries: {},
           charts: {
             complaintsByStatus: buildStatusChartData(
               complaintStatuses,
@@ -324,6 +341,13 @@ const getDashboardAnalytics = async (req, res) => {
           success: true,
           data: {
             role: "service_provider",
+            summaries: {
+              quotations: {
+                submitted: 0,
+                revisionRequested: 0,
+                approved: 0,
+              },
+            },
             charts: {
               tasksByStatus: [],
               completedTasksTrend: buckets.map((bucket) => ({
@@ -344,6 +368,25 @@ const getDashboardAnalytics = async (req, res) => {
       const providerMatch = {
         serviceProvider: { $in: providerIds },
       };
+
+      const [
+        providerSubmittedQuotations,
+        providerRevisionRequestedQuotations,
+        providerApprovedQuotations,
+      ] = await Promise.all([
+        Quotation.countDocuments({
+          ...providerMatch,
+          status: "submitted",
+        }),
+        Quotation.countDocuments({
+          ...providerMatch,
+          status: "revision_requested",
+        }),
+        Quotation.countDocuments({
+          ...providerMatch,
+          status: "approved",
+        }),
+      ]);
 
       const [tasksByStatusRows, completedTasksTrend, paymentsTrend] =
         await Promise.all([
@@ -372,6 +415,13 @@ const getDashboardAnalytics = async (req, res) => {
         success: true,
         data: {
           role: "service_provider",
+          summaries: {
+            quotations: {
+              submitted: providerSubmittedQuotations,
+              revisionRequested: providerRevisionRequestedQuotations,
+              approved: providerApprovedQuotations,
+            },
+          },
           charts: {
             tasksByStatus: buildStatusChartData(taskStatuses, tasksByStatusRows),
             completedTasksTrend,

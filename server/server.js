@@ -10,6 +10,7 @@ const taskRoutes = require("./routes/taskRoutes");
 const complaintRoutes = require("./routes/complaintRoutes");
 const contractRoutes = require("./routes/contractRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const quotationRoutes = require("./routes/quotationRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const authRoutes = require("./routes/authRoutes");
 
@@ -22,6 +23,7 @@ app.use("/api/contracts", contractRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/quotations", quotationRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/auth", authRoutes);
 

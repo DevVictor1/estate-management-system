@@ -11,6 +11,10 @@ const getEmailConfig = () => ({
     process.env.EMAIL_PROVIDER_STATUS_RECIPIENT || "",
   emailContractRecipient: process.env.EMAIL_CONTRACT_RECIPIENT || "",
   emailPaymentRecipient: process.env.EMAIL_PAYMENT_RECIPIENT || "",
+  emailQuotationAdminRecipient:
+    process.env.EMAIL_QUOTATION_ADMIN_RECIPIENT || "",
+  emailQuotationProviderRecipient:
+    process.env.EMAIL_QUOTATION_PROVIDER_RECIPIENT || "",
   emailVerificationExpiresMinutes:
     process.env.EMAIL_VERIFICATION_EXPIRES_MINUTES || "",
   passwordResetExpiresMinutes:
