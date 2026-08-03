@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 let cachedFullLogoDataUri = null;
+let logoWarningLogged = false;
 
 const getFullLogoDataUri = () => {
   if (cachedFullLogoDataUri) {
@@ -9,17 +10,17 @@ const getFullLogoDataUri = () => {
   }
 
   try {
-    const logoPath = path.resolve(
-      __dirname,
-      "../../client/src/assets/branding/estatehub-logo.png"
-    );
+    const logoPath = path.resolve(__dirname, "../assets/branding/estatehub-logo.png");
     const logoBuffer = fs.readFileSync(logoPath);
     cachedFullLogoDataUri = `data:image/png;base64,${logoBuffer.toString("base64")}`;
     return cachedFullLogoDataUri;
   } catch (error) {
-    console.error(
-      `Email branding asset unavailable: ${error.message || "Unknown logo error."}`
-    );
+    if (!logoWarningLogged) {
+      logoWarningLogged = true;
+      console.warn(
+        `Email branding asset unavailable: ${error.message || "Unknown logo error."}`
+      );
+    }
     return "";
   }
 };
