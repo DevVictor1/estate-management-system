@@ -29,6 +29,8 @@ const initialFilters = {
   dateToFilter: "",
 };
 
+const quotableTaskStatuses = ["pending", "in_progress", "overdue"];
+
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",
@@ -302,8 +304,16 @@ function Quotations() {
 
     return tasks.filter((task) => {
       const latestQuotation = task.latestQuotation || latestQuotationByTask.get(task._id);
+      const hasAllowedTaskStatus = quotableTaskStatuses.includes(task.status);
+      const hasNoQuotation = !latestQuotation;
+      const needsRevision = latestQuotation?.status === "revision_requested";
+      const hasCreatedContract = Boolean(latestQuotation?.createdContract);
 
-      return !latestQuotation || latestQuotation.status === "revision_requested";
+      return (
+        hasAllowedTaskStatus &&
+        !hasCreatedContract &&
+        (hasNoQuotation || needsRevision)
+      );
     });
   }, [isServiceProvider, latestQuotationByTask, tasks]);
 
