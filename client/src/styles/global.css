@@ -1356,6 +1356,11 @@ button:hover {
   box-shadow: var(--shadow-soft);
 }
 
+.quotation-form-card {
+  padding: 30px 38px 32px;
+  box-sizing: border-box;
+}
+
 .quotation-form-header,
 .quotation-detail-header,
 .quotation-review-header,
@@ -1403,6 +1408,8 @@ button:hover {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   column-gap: 22px;
   row-gap: 26px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .quotation-form-group {
@@ -1424,6 +1431,7 @@ button:hover {
 
 .quotation-form-control {
   width: 100%;
+  max-width: 100%;
   min-height: 46px;
   padding: 11px 14px;
   border: 1px solid #d9e2ec;
@@ -1431,6 +1439,7 @@ button:hover {
   background: #ffffff;
   font-size: 0.97rem;
   color: #14213d;
+  box-sizing: border-box;
 }
 
 .quotation-form-textarea {
@@ -1445,6 +1454,8 @@ button:hover {
   gap: 12px;
   margin-top: 6px;
   padding-top: 4px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .quotation-primary-button,
@@ -3852,6 +3863,10 @@ button:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .quotation-form-card {
+    padding: 28px 32px 30px;
+  }
+
   .service-providers-page .provider-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3994,6 +4009,10 @@ button:hover {
   .quotation-detail-card {
     padding: 18px;
     border-radius: 20px;
+  }
+
+  .quotation-form-card {
+    padding: 20px 20px 22px;
   }
 
   .quotation-form-header,
