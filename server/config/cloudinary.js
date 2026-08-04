@@ -7,6 +7,9 @@ const getCloudinaryConfig = () => ({
   complaintFolder:
     process.env.CLOUDINARY_COMPLAINT_FOLDER ||
     "estate-management/complaints",
+  paymentEvidenceFolder:
+    process.env.CLOUDINARY_PAYMENT_EVIDENCE_FOLDER ||
+    "estate-management/payments/evidence",
 });
 
 const isCloudinaryConfigured = () => {

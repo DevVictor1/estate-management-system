@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
+const allowedEvidenceMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+]);
+const maxEvidenceSizeBytes = 8 * 1024 * 1024;
+
 const initialFormData = {
   serviceProvider: "",
   contract: "",
@@ -85,6 +93,12 @@ function Payments() {
   const [feedback, setFeedback] = useState("");
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [evidenceModalPaymentId, setEvidenceModalPaymentId] = useState("");
+  const [selectedEvidenceFile, setSelectedEvidenceFile] = useState(null);
+  const [evidenceError, setEvidenceError] = useState("");
+  const [evidenceSubmitting, setEvidenceSubmitting] = useState(false);
+  const [evidenceDeleting, setEvidenceDeleting] = useState(false);
+  const [evidencePreview, setEvidencePreview] = useState(null);
   const isAdmin = user?.role === "admin";
   const isServiceProvider = user?.role === "service_provider";
 
@@ -123,6 +137,12 @@ function Payments() {
     });
     setEditingPaymentId("");
     setFeedback("");
+  };
+
+  const closeEvidenceModal = () => {
+    setEvidenceModalPaymentId("");
+    setSelectedEvidenceFile(null);
+    setEvidenceError("");
   };
 
   useEffect(() => {
@@ -306,13 +326,13 @@ function Payments() {
   };
 
   const handleStatusUpdate = async (payment, nextStatus) => {
-    const actionLabel =
+    const confirmationMessage =
       nextStatus === "paid"
-        ? "mark this payment as paid"
-        : "cancel this pending payment";
-    const confirmed = window.confirm(
-      `Are you sure you want to ${actionLabel}?`
-    );
+        ? payment.paymentEvidence?.url
+          ? "Are you sure you want to mark this payment as paid?"
+          : "No payment evidence has been uploaded. Are you sure you want to mark this payment as paid?"
+        : "Are you sure you want to cancel this pending payment?";
+    const confirmed = window.confirm(confirmationMessage);
 
     if (!confirmed) {
       return;
@@ -403,6 +423,119 @@ function Payments() {
     }
   };
 
+  const openEvidenceModal = (payment) => {
+    setEvidenceModalPaymentId(payment._id);
+    setSelectedEvidenceFile(null);
+    setEvidenceError("");
+    dismissToast();
+  };
+
+  const handleEvidenceFileChange = (event) => {
+    const file = event.target.files?.[0] || null;
+
+    if (!file) {
+      setSelectedEvidenceFile(null);
+      setEvidenceError("");
+      return;
+    }
+
+    if (!allowedEvidenceMimeTypes.has(file.type)) {
+      setSelectedEvidenceFile(null);
+      setEvidenceError(
+        "Only JPG, PNG, WebP images, or PDF files can be uploaded as payment evidence."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    if (!file.size) {
+      setSelectedEvidenceFile(null);
+      setEvidenceError("The selected payment evidence file is empty.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > maxEvidenceSizeBytes) {
+      setSelectedEvidenceFile(null);
+      setEvidenceError("Payment evidence must be 8 MB or smaller.");
+      event.target.value = "";
+      return;
+    }
+
+    setSelectedEvidenceFile(file);
+    setEvidenceError("");
+  };
+
+  const handleEvidenceUpload = async () => {
+    if (!evidenceModalPaymentId || !selectedEvidenceFile) {
+      setEvidenceError("Please choose one payment evidence file to upload.");
+      return;
+    }
+
+    setEvidenceSubmitting(true);
+    setEvidenceError("");
+    setPageError("");
+    setFeedback("");
+    dismissToast();
+
+    const formData = new FormData();
+    formData.append("evidence", selectedEvidenceFile);
+
+    try {
+      await api.post(`/api/payments/${evidenceModalPaymentId}/evidence`, formData);
+      await fetchPageData();
+      closeEvidenceModal();
+      setFeedback("Payment evidence saved successfully.");
+      showToast("Payment evidence saved", "The payment evidence was updated successfully.");
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to upload payment evidence."
+      );
+      setEvidenceError(message);
+      showToast("Payment evidence could not be saved", message);
+    } finally {
+      setEvidenceSubmitting(false);
+    }
+  };
+
+  const handleEvidenceDelete = async () => {
+    if (!evidenceModalPaymentId) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Are you sure you want to remove the payment evidence from this payment?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setEvidenceDeleting(true);
+    setEvidenceError("");
+    setPageError("");
+    setFeedback("");
+    dismissToast();
+
+    try {
+      await api.delete(`/api/payments/${evidenceModalPaymentId}/evidence`);
+      await fetchPageData();
+      closeEvidenceModal();
+      setFeedback("Payment evidence removed successfully.");
+      showToast("Payment evidence removed", "The payment evidence was removed successfully.");
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to remove payment evidence."
+      );
+      setEvidenceError(message);
+      showToast("Payment evidence could not be removed", message);
+    } finally {
+      setEvidenceDeleting(false);
+    }
+  };
+
   const filteredPayments = payments.filter((payment) => {
     const searchValue = searchTerm.trim().toLowerCase();
     const matchesSearch =
@@ -472,6 +605,12 @@ function Payments() {
       return sum + (Number(payment.amount) || 0);
     }, 0),
   };
+
+  const selectedEvidencePayment = useMemo(
+    () =>
+      payments.find((payment) => payment._id === evidenceModalPaymentId) || null,
+    [evidenceModalPaymentId, payments]
+  );
 
   if (loading) {
     return <p>Loading payments...</p>;
@@ -558,6 +697,7 @@ function Payments() {
                       <th>Payment Method</th>
                       <th>Status</th>
                       <th>Reference Number</th>
+                      <th>Payment Evidence</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -578,6 +718,11 @@ function Payments() {
                           </span>
                         </td>
                         <td>{payment.referenceNumber || "-"}</td>
+                        <td>
+                          {renderProviderEvidenceCell(payment, {
+                            onPreviewImage: setEvidencePreview,
+                          })}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -630,6 +775,16 @@ function Payments() {
                           Reference Number
                         </span>
                         <strong>{payment.referenceNumber || "-"}</strong>
+                      </div>
+                      <div className="provider-payments-card-field">
+                        <span className="provider-payments-card-label">
+                          Payment Evidence
+                        </span>
+                        <div className="payments-evidence-inline">
+                          {renderProviderEvidenceCell(payment, {
+                            onPreviewImage: setEvidencePreview,
+                          })}
+                        </div>
                       </div>
                     </div>
                   </article>
@@ -1124,6 +1279,7 @@ function Payments() {
                 "Status",
                 "Reference Number",
                 "Notes",
+                "Evidence",
                 ...(isAdmin ? ["Actions"] : []),
               ].map((heading) => (
                 <th
@@ -1169,6 +1325,23 @@ function Payments() {
                   </td>
                   <td style={cellStyle}>{payment.referenceNumber || "-"}</td>
                   <td style={cellStyle}>{payment.notes || "-"}</td>
+                  <td style={cellStyle}>
+                    <div className="payments-evidence-inline">
+                      {payment.paymentEvidence?.url ? (
+                        <button
+                          type="button"
+                          onClick={() => openEvidenceModal(payment)}
+                          className="payments-evidence-link-button"
+                        >
+                          View Evidence
+                        </button>
+                      ) : (
+                        <span className="payments-evidence-empty">
+                          No evidence
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   {isAdmin ? (
                     <td style={paymentActionsCellStyle}>
                       <div className="payments-action-row">
@@ -1218,6 +1391,15 @@ function Payments() {
                         ) : null}
                         <button
                           type="button"
+                          onClick={() => openEvidenceModal(payment)}
+                          style={actionButtonStyle}
+                        >
+                          {payment.paymentEvidence?.url
+                            ? "Manage Evidence"
+                            : "Upload Evidence"}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleEdit(payment)}
                           style={actionButtonStyle}
                         >
@@ -1241,7 +1423,7 @@ function Payments() {
             ) : (
               <tr>
                 <td
-                  colSpan={isAdmin ? "9" : "8"}
+                  colSpan={isAdmin ? "11" : "9"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
@@ -1257,6 +1439,197 @@ function Payments() {
           </tbody>
         </table>
       </div>
+
+      {isAdmin && selectedEvidencePayment ? (
+        <div
+          className="payments-evidence-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Payment evidence manager"
+          onClick={closeEvidenceModal}
+        >
+          <div
+            className="payments-evidence-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payments-evidence-header">
+              <div>
+                <p className="payments-evidence-eyebrow">Payment Evidence</p>
+                <h2>
+                  {selectedEvidencePayment.contract?.contractTitle ||
+                    "Contract Payment"}
+                </h2>
+                <p>
+                  {selectedEvidencePayment.serviceProvider?.companyName || "-"} •{" "}
+                  {currencyFormatter.format(
+                    Number(selectedEvidencePayment.amount) || 0
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="payments-evidence-close"
+                onClick={closeEvidenceModal}
+              >
+                Close
+              </button>
+            </div>
+
+            {selectedEvidencePayment.paymentEvidence?.url ? (
+              <div className="payments-evidence-current">
+                <div className="payments-evidence-current-copy">
+                  <strong>Current evidence</strong>
+                  <p>{selectedEvidencePayment.paymentEvidence.originalName || "Payment evidence"}</p>
+                  <span>
+                    {selectedEvidencePayment.paymentEvidence.mimeType || "File"} •{" "}
+                    {formatFileSize(selectedEvidencePayment.paymentEvidence.size)}
+                  </span>
+                </div>
+                {isImageEvidence(selectedEvidencePayment.paymentEvidence) ? (
+                  <button
+                    type="button"
+                    className="payments-evidence-thumbnail-button"
+                    onClick={() =>
+                      setEvidencePreview({
+                        url: selectedEvidencePayment.paymentEvidence.url,
+                        originalName:
+                          selectedEvidencePayment.paymentEvidence.originalName ||
+                          "Payment evidence",
+                      })
+                    }
+                  >
+                    <img
+                      src={selectedEvidencePayment.paymentEvidence.url}
+                      alt={
+                        selectedEvidencePayment.paymentEvidence.originalName ||
+                        "Payment evidence preview"
+                      }
+                      className="payments-evidence-thumbnail"
+                    />
+                  </button>
+                ) : (
+                  <div className="payments-evidence-pdf-card">
+                    <strong>PDF evidence available</strong>
+                  </div>
+                )}
+                <div className="payments-evidence-link-row">
+                  <a
+                    href={selectedEvidencePayment.paymentEvidence.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="payments-evidence-link-button"
+                  >
+                    View
+                  </a>
+                  <a
+                    href={selectedEvidencePayment.paymentEvidence.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download={selectedEvidencePayment.paymentEvidence.originalName || "payment-evidence"}
+                    className="payments-evidence-link-button"
+                  >
+                    Download
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="payments-evidence-empty-card">
+                No payment evidence has been uploaded for this payment yet.
+              </div>
+            )}
+
+            <div className="payments-evidence-upload">
+              <label className="payments-evidence-label" htmlFor="paymentEvidenceFile">
+                {selectedEvidencePayment.paymentEvidence?.url
+                  ? "Replace evidence"
+                  : "Upload evidence"}
+              </label>
+              <p className="payments-evidence-hint">
+                Upload one JPG, PNG, WebP image, or PDF file up to 8 MB.
+              </p>
+              <input
+                id="paymentEvidenceFile"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={handleEvidenceFileChange}
+                className="payments-evidence-input"
+              />
+              {selectedEvidenceFile ? (
+                <div className="payments-evidence-selected">
+                  <strong>{selectedEvidenceFile.name}</strong>
+                  <span>{formatFileSize(selectedEvidenceFile.size)}</span>
+                </div>
+              ) : null}
+              {evidenceError ? (
+                <div className="payments-form-alert payments-evidence-alert" role="alert">
+                  {evidenceError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="payments-evidence-actions">
+              <button
+                type="button"
+                onClick={handleEvidenceUpload}
+                disabled={evidenceSubmitting || evidenceDeleting}
+                className="payments-evidence-primary"
+              >
+                {evidenceSubmitting
+                  ? selectedEvidencePayment.paymentEvidence?.url
+                    ? "Replacing..."
+                    : "Uploading..."
+                  : selectedEvidencePayment.paymentEvidence?.url
+                  ? "Replace Evidence"
+                  : "Upload Evidence"}
+              </button>
+              {selectedEvidencePayment.paymentEvidence?.url ? (
+                <button
+                  type="button"
+                  onClick={handleEvidenceDelete}
+                  disabled={evidenceSubmitting || evidenceDeleting}
+                  className="payments-evidence-secondary"
+                >
+                  {evidenceDeleting ? "Removing..." : "Remove Evidence"}
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {evidencePreview ? (
+        <div
+          className="payments-evidence-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Payment evidence preview"
+          onClick={() => setEvidencePreview(null)}
+        >
+          <div
+            className="payments-evidence-lightbox-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payments-evidence-lightbox-header">
+              <div>
+                <p className="payments-evidence-eyebrow">Payment Evidence</p>
+                <h2>{evidencePreview.originalName || "Evidence preview"}</h2>
+              </div>
+              <button
+                type="button"
+                className="payments-evidence-close"
+                onClick={() => setEvidencePreview(null)}
+              >
+                Close
+              </button>
+            </div>
+            <img
+              src={evidencePreview.url}
+              alt={evidencePreview.originalName || "Payment evidence preview"}
+              className="payments-evidence-lightbox-image"
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1295,7 +1668,7 @@ const cellStyle = {
 
 const paymentActionsCellStyle = {
   ...cellStyle,
-  minWidth: "360px",
+  minWidth: "460px",
   whiteSpace: "nowrap",
 };
 
@@ -1355,3 +1728,82 @@ const statusBadgeStyles = {
 };
 
 export default Payments;
+
+function isImageEvidence(paymentEvidence) {
+  return Boolean(paymentEvidence?.mimeType?.startsWith("image/"));
+}
+
+function formatFileSize(size) {
+  const safeSize = Number(size) || 0;
+
+  if (safeSize >= 1024 * 1024) {
+    return `${(safeSize / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  if (safeSize >= 1024) {
+    return `${Math.round(safeSize / 1024)} KB`;
+  }
+
+  return `${safeSize} B`;
+}
+
+function renderProviderEvidenceCell(payment, { onPreviewImage }) {
+  if (!payment.paymentEvidence?.url) {
+    return (
+      <span className="payments-evidence-empty">
+        No payment evidence uploaded.
+      </span>
+    );
+  }
+
+  if (isImageEvidence(payment.paymentEvidence)) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            onPreviewImage({
+              url: payment.paymentEvidence.url,
+              originalName:
+                payment.paymentEvidence.originalName || "Payment evidence",
+            })
+          }
+          className="payments-evidence-link-button"
+        >
+          View Image
+        </button>
+        <a
+          href={payment.paymentEvidence.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={payment.paymentEvidence.originalName || "payment-evidence"}
+          className="payments-evidence-link-button"
+        >
+          Download
+        </a>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <a
+        href={payment.paymentEvidence.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="payments-evidence-link-button"
+      >
+        View PDF
+      </a>
+      <a
+        href={payment.paymentEvidence.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        download={payment.paymentEvidence.originalName || "payment-evidence.pdf"}
+        className="payments-evidence-link-button"
+      >
+        Download
+      </a>
+    </>
+  );
+}

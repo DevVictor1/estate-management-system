@@ -12,6 +12,10 @@ const {
   resolveVerifiedUserEmailRecipient,
 } = require("../utils/verifiedRecipients");
 const {
+  uploadPaymentEvidence: uploadPaymentEvidenceToCloudinary,
+  deletePaymentEvidence: deletePaymentEvidenceFromCloudinary,
+} = require("../utils/paymentEvidence");
+const {
   PAYMENT_TYPES,
   PAYMENT_STATUSES,
   CONTRACT_PROGRESS_PAYMENT_TYPES,
@@ -51,6 +55,38 @@ const normalizePaymentTypeLabel = (paymentType = "final") =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+
+const serializePaymentEvidence = (paymentEvidence) => {
+  if (!paymentEvidence) {
+    return null;
+  }
+
+  const source = paymentEvidence.toObject ? paymentEvidence.toObject() : paymentEvidence;
+
+  if (!source?.url) {
+    return null;
+  }
+
+  return {
+    url: source.url,
+    originalName: source.originalName || "",
+    mimeType: source.mimeType || "",
+    size: Number(source.size) || 0,
+    uploadedAt: source.uploadedAt || null,
+  };
+};
+
+const serializePaymentRecord = (payment) => {
+  if (!payment) {
+    return payment;
+  }
+
+  const paymentObject = payment.toObject ? payment.toObject() : { ...payment };
+  paymentObject.paymentEvidence = serializePaymentEvidence(
+    paymentObject.paymentEvidence
+  );
+  return paymentObject;
+};
 
 const getPaymentNotificationRecipient = async (provider) => {
   const { emailPaymentRecipient } = getEmailConfig();
@@ -257,11 +293,11 @@ const populatePaymentRecord = async (paymentId) => {
   }
 
   if (!payment.contract) {
-    return payment.toObject();
+    return serializePaymentRecord(payment);
   }
 
   const summaryMap = await buildContractFinancialSummaryMap([payment.contract]);
-  const paymentObject = payment.toObject();
+  const paymentObject = serializePaymentRecord(payment);
 
   paymentObject.contract = attachFinancialSummaryToContract(
     payment.contract,
@@ -320,6 +356,7 @@ const sendPaymentNotification = async ({
     paymentStatus: payment.status,
     referenceNumber: payment.referenceNumber,
     notes: payment.notes,
+    hasPaymentEvidence: Boolean(payment.paymentEvidence?.url),
     reviewUrl: getPaymentsReviewUrl(),
     subject,
     heading,
@@ -447,7 +484,7 @@ const getPayments = async (req, res) => {
       .filter(Boolean);
     const summaryMap = await buildContractFinancialSummaryMap(contractsForSummary);
     const paymentData = payments.map((payment) => {
-      const paymentObject = payment.toObject();
+      const paymentObject = serializePaymentRecord(payment);
 
       if (payment.contract) {
         paymentObject.contract = attachFinancialSummaryToContract(
@@ -495,7 +532,7 @@ const getPaymentById = async (req, res) => {
       });
     }
 
-    let paymentData = payment.toObject();
+      let paymentData = serializePaymentRecord(payment);
 
     if (payment.contract) {
       const summaryMap = await buildContractFinancialSummaryMap([payment.contract]);
@@ -688,14 +725,166 @@ const updatePaymentStatus = async (req, res) => {
   }
 };
 
-const deletePayment = async (req, res) => {
+const uploadPaymentEvidence = async (req, res) => {
   try {
-    const payment = await Payment.findByIdAndDelete(req.params.id);
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId).select("+paymentEvidence.publicId");
 
     if (!payment) {
       return res.status(404).json({
         success: false,
         message: "Payment not found",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload one payment evidence file.",
+      });
+    }
+
+    const existingEvidence = payment.paymentEvidence?.publicId
+      ? payment.paymentEvidence.toObject()
+      : null;
+    const uploadedEvidence = await uploadPaymentEvidenceToCloudinary(req.file);
+
+    try {
+      payment.paymentEvidence = {
+        ...uploadedEvidence,
+        uploadedBy: req.user?._id,
+      };
+      await payment.save();
+    } catch (error) {
+      await deletePaymentEvidenceFromCloudinary(uploadedEvidence).catch(() => {});
+      throw error;
+    }
+
+    if (existingEvidence?.publicId) {
+      await deletePaymentEvidenceFromCloudinary(existingEvidence).catch(() => {
+        console.warn(
+          "Payment evidence was replaced, but the previous Cloudinary file could not be deleted."
+        );
+      });
+    }
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    return res.status(200).json({
+      success: true,
+      message: existingEvidence
+        ? "Payment evidence replaced successfully."
+        : "Payment evidence uploaded successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to upload payment evidence"
+          : error.message,
+    });
+  }
+};
+
+const deletePaymentEvidence = async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId).select("+paymentEvidence.publicId");
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    if (!payment.paymentEvidence?.url) {
+      const populatedPayment = await populatePaymentRecord(payment._id);
+
+      return res.status(200).json({
+        success: true,
+        message: "No payment evidence was attached to this payment.",
+        data: populatedPayment,
+      });
+    }
+
+    const existingEvidence = payment.paymentEvidence.toObject
+      ? payment.paymentEvidence.toObject()
+      : payment.paymentEvidence;
+
+    payment.paymentEvidence = undefined;
+    await payment.save();
+
+    if (existingEvidence?.publicId) {
+      await deletePaymentEvidenceFromCloudinary(existingEvidence).catch(() => {
+        console.warn(
+          "Payment evidence metadata was removed, but the Cloudinary file could not be deleted."
+        );
+      });
+    }
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment evidence removed successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to remove payment evidence"
+          : error.message,
+    });
+  }
+};
+
+const deletePayment = async (req, res) => {
+  try {
+    const payment = await Payment.findByIdAndDelete(req.params.id).select(
+      "+paymentEvidence.publicId"
+    );
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    if (payment.paymentEvidence?.publicId) {
+      await deletePaymentEvidenceFromCloudinary(payment.paymentEvidence).catch(() => {
+        console.warn(
+          "Payment was deleted, but the linked Cloudinary payment evidence file could not be deleted."
+        );
       });
     }
 
@@ -717,5 +906,7 @@ module.exports = {
   getPaymentById,
   updatePayment,
   updatePaymentStatus,
+  uploadPaymentEvidence,
+  deletePaymentEvidence,
   deletePayment,
 };

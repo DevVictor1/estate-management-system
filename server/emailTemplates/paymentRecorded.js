@@ -47,6 +47,7 @@ const buildPaymentRecordedEmail = ({
   paymentStatus,
   referenceNumber,
   notes,
+  hasPaymentEvidence,
   reviewUrl,
   subject,
   heading,
@@ -66,6 +67,9 @@ const buildPaymentRecordedEmail = ({
     typeof reviewUrl === "string" && /^https?:\/\//i.test(reviewUrl)
       ? reviewUrl
       : "";
+  const evidenceMessage = hasPaymentEvidence
+    ? "Payment evidence is available in your EstateHub account."
+    : "";
 
   const amountRow = safeAmount
     ? `
@@ -153,6 +157,13 @@ const buildPaymentRecordedEmail = ({
             <p style="margin: 0 0 20px; color: #64748b;">
               ${safeIntro}
             </p>
+            ${
+              evidenceMessage
+                ? `<p style="margin: 0 0 20px; color: #64748b;">${escapeHtml(
+                    evidenceMessage
+                  )}</p>`
+                : ""
+            }
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
                 <tr>
@@ -186,6 +197,7 @@ const buildPaymentRecordedEmail = ({
       "",
       heading || "A payment has been recorded for your contract.",
       intro || "Log in to EstateHub to review your payment history.",
+      ...(evidenceMessage ? [evidenceMessage] : []),
       "",
       `Company name: ${companyName || "Not provided"}`,
       `Contract title: ${contractTitle || "Untitled contract"}`,
