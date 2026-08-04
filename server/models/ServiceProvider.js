@@ -1,5 +1,43 @@
 const mongoose = require("mongoose");
 
+const paymentDetailsSchema = new mongoose.Schema(
+  {
+    bankName: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
+    accountName: {
+      type: String,
+      trim: true,
+      maxlength: 150,
+    },
+    accountNumber: {
+      type: String,
+      trim: true,
+      maxlength: 30,
+    },
+    accountType: {
+      type: String,
+      enum: ["savings", "current", "corporate", "other"],
+    },
+    preferredPaymentMethod: {
+      type: String,
+      enum: ["bank_transfer", "cash", "cheque", "wallet", "other"],
+      default: "bank_transfer",
+    },
+    paystackRecipientCode: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
+    updatedAt: {
+      type: Date,
+    },
+  },
+  { _id: false }
+);
+
 const serviceProviderSchema = new mongoose.Schema(
 {
     companyName: {
@@ -61,6 +99,8 @@ const serviceProviderSchema = new mongoose.Schema(
         type: String,
         trim: true,
     },
+
+    paymentDetails: paymentDetailsSchema,
 },
 { timestamps: true }
 );

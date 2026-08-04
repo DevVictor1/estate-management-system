@@ -3,6 +3,7 @@ import {
   FaArrowRotateLeft,
   FaBroom,
   FaCheck,
+  FaCopy,
   FaCircleCheck,
   FaClipboardQuestion,
   FaPhone,
@@ -34,6 +35,15 @@ const initialProviderFilters = {
   statusFilter: "",
 };
 
+const initialPaymentDetailsForm = {
+  bankName: "",
+  accountName: "",
+  accountNumber: "",
+  accountType: "",
+  preferredPaymentMethod: "bank_transfer",
+  paystackRecipientCode: "",
+};
+
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
   month: "short",
@@ -51,6 +61,13 @@ function ServiceProviders() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [paymentDetailsForm, setPaymentDetailsForm] = useState(
+    initialPaymentDetailsForm
+  );
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [paymentFeedback, setPaymentFeedback] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [copiedAccountFeedback, setCopiedAccountFeedback] = useState("");
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
@@ -70,7 +87,16 @@ function ServiceProviders() {
     try {
       setError("");
       const response = await api.get("/api/service-providers");
-      setProviders(response.data.data || []);
+      const fetchedProviders = response.data.data || [];
+      setProviders(fetchedProviders);
+
+      if (isServiceProvider) {
+        setPaymentDetailsForm(
+          buildPaymentDetailsForm(
+            fetchedProviders[0]?.paymentDetails || initialPaymentDetailsForm
+          )
+        );
+      }
     } catch (err) {
       setError(
         err.response?.data?.message || "Failed to load service providers."
@@ -94,6 +120,7 @@ function ServiceProviders() {
 
   const handleEdit = (provider) => {
     setError("");
+    setCopiedAccountFeedback("");
     setEditingProviderId(provider._id);
     setFormData({
       companyName: provider.companyName || "",
@@ -182,6 +209,67 @@ function ServiceProviders() {
     }
   };
 
+  const handlePaymentDetailsChange = (event) => {
+    const { name, value } = event.target;
+
+    if (paymentError) {
+      setPaymentError("");
+    }
+
+    if (paymentFeedback) {
+      setPaymentFeedback("");
+    }
+
+    setPaymentDetailsForm((currentFormData) => ({
+      ...currentFormData,
+      [name]: value,
+    }));
+  };
+
+  const handlePaymentDetailsSubmit = async (event) => {
+    event.preventDefault();
+    setPaymentSubmitting(true);
+    setPaymentError("");
+    setPaymentFeedback("");
+
+    try {
+      const response = await api.patch(
+        "/api/service-providers/me/payment-details",
+        paymentDetailsForm
+      );
+
+      setPaymentDetailsForm(
+        buildPaymentDetailsForm(response.data.data?.paymentDetails || {})
+      );
+      setPaymentFeedback("Payment information updated successfully.");
+      await fetchProviders();
+    } catch (err) {
+      setPaymentError(
+        err.response?.data?.message || "Failed to update payment information."
+      );
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  };
+
+  const handleCopyAccountNumber = async (accountNumber) => {
+    if (!accountNumber) {
+      setCopiedAccountFeedback("No account number available to copy.");
+      return;
+    }
+
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+
+      await navigator.clipboard.writeText(accountNumber);
+      setCopiedAccountFeedback("Account number copied.");
+    } catch (copyError) {
+      setCopiedAccountFeedback("Unable to copy the account number right now.");
+    }
+  };
+
   const roleScopedProviders = useMemo(
     () =>
       providers.filter((provider) => {
@@ -259,6 +347,23 @@ function ServiceProviders() {
     categoryFilter !== initialProviderFilters.categoryFilter ||
     statusFilter !== initialProviderFilters.statusFilter;
 
+  const serviceProviderProfile = useMemo(
+    () =>
+      (isServiceProvider ? filteredProviders[0] : null) ||
+      (isServiceProvider ? roleScopedProviders[0] : null) ||
+      (isServiceProvider ? providers[0] : null) ||
+      null,
+    [filteredProviders, isServiceProvider, providers, roleScopedProviders]
+  );
+
+  const editingProvider = useMemo(
+    () =>
+      editingProviderId
+        ? providers.find((provider) => provider._id === editingProviderId) || null
+        : null,
+    [editingProviderId, providers]
+  );
+
   const residentResultsText = useMemo(() => {
     if (!isResident) {
       return "";
@@ -301,7 +406,11 @@ function ServiceProviders() {
       ) : null}
 
       {!isAdmin && !isResident ? (
-        <p className="providers-note">You have view-only access on this page.</p>
+        <p className="providers-note">
+          {isServiceProvider
+            ? "You can review your provider profile here and update your payment information below."
+            : "You have view-only access on this page."}
+        </p>
       ) : null}
 
       {isServiceProvider ? (
@@ -592,6 +701,77 @@ function ServiceProviders() {
               ) : null}
             </div>
           </form>
+        </section>
+      ) : null}
+
+      {isAdmin && editingProvider ? (
+        <section className="provider-payment-card provider-payment-card-admin">
+          <div className="provider-payment-header">
+            <div>
+              <h2>Payment Information</h2>
+              <p>
+                Review the saved payment destination for{" "}
+                <strong>{editingProvider.companyName}</strong>.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="provider-secondary-button provider-payment-copy-button"
+              onClick={() =>
+                handleCopyAccountNumber(
+                  editingProvider.paymentDetails?.accountNumber || ""
+                )
+              }
+              disabled={!editingProvider.paymentDetails?.accountNumber}
+            >
+              <FaCopy />
+              <span>Copy Account Number</span>
+            </button>
+          </div>
+
+          {copiedAccountFeedback ? (
+            <p className="provider-payment-copy-feedback">{copiedAccountFeedback}</p>
+          ) : null}
+
+          <div className="provider-payment-summary-grid">
+            <div className="provider-payment-summary-field">
+              <span>Bank Name</span>
+              <strong>{editingProvider.paymentDetails?.bankName || "Not provided"}</strong>
+            </div>
+            <div className="provider-payment-summary-field">
+              <span>Account Name</span>
+              <strong>{editingProvider.paymentDetails?.accountName || "Not provided"}</strong>
+            </div>
+            <div className="provider-payment-summary-field">
+              <span>Account Number</span>
+              <strong>
+                {editingProvider.paymentDetails?.accountNumber || "Not provided"}
+              </strong>
+            </div>
+            <div className="provider-payment-summary-field">
+              <span>Account Type</span>
+              <strong>
+                {formatPaymentDetailLabel(
+                  editingProvider.paymentDetails?.accountType
+                ) || "Not provided"}
+              </strong>
+            </div>
+            <div className="provider-payment-summary-field">
+              <span>Preferred Payment Method</span>
+              <strong>
+                {formatPaymentDetailLabel(
+                  editingProvider.paymentDetails?.preferredPaymentMethod
+                ) || "Not provided"}
+              </strong>
+            </div>
+            <div className="provider-payment-summary-field">
+              <span>Paystack Recipient Code</span>
+              <strong>
+                {editingProvider.paymentDetails?.paystackRecipientCode ||
+                  "Not provided"}
+              </strong>
+            </div>
+          </div>
         </section>
       ) : null}
 
@@ -931,6 +1111,194 @@ function ServiceProviders() {
               ) : null}
             </div>
           )}
+
+          {isServiceProvider && serviceProviderProfile ? (
+            <section className="provider-payment-card">
+              <div className="provider-payment-header">
+                <div>
+                  <h2>Payment Information</h2>
+                  <p>
+                    Save the account details the Estate Manager should use when
+                    recording payments for your company.
+                  </p>
+                </div>
+              </div>
+
+              <div className="provider-payment-summary-grid">
+                <div className="provider-payment-summary-field">
+                  <span>Bank Name</span>
+                  <strong>
+                    {serviceProviderProfile.paymentDetails?.bankName || "Not provided"}
+                  </strong>
+                </div>
+                <div className="provider-payment-summary-field">
+                  <span>Account Name</span>
+                  <strong>
+                    {serviceProviderProfile.paymentDetails?.accountName || "Not provided"}
+                  </strong>
+                </div>
+                <div className="provider-payment-summary-field">
+                  <span>Account Number</span>
+                  <strong>
+                    {maskAccountNumber(
+                      serviceProviderProfile.paymentDetails?.accountNumber || ""
+                    ) || "Not provided"}
+                  </strong>
+                </div>
+                <div className="provider-payment-summary-field">
+                  <span>Account Type</span>
+                  <strong>
+                    {formatPaymentDetailLabel(
+                      serviceProviderProfile.paymentDetails?.accountType
+                    ) || "Not provided"}
+                  </strong>
+                </div>
+                <div className="provider-payment-summary-field">
+                  <span>Preferred Payment Method</span>
+                  <strong>
+                    {formatPaymentDetailLabel(
+                      serviceProviderProfile.paymentDetails?.preferredPaymentMethod
+                    ) || "Not provided"}
+                  </strong>
+                </div>
+                <div className="provider-payment-summary-field">
+                  <span>Last Updated</span>
+                  <strong>
+                    {serviceProviderProfile.paymentDetails?.updatedAt
+                      ? dateFormatter.format(
+                          new Date(serviceProviderProfile.paymentDetails.updatedAt)
+                        )
+                      : "Not provided"}
+                  </strong>
+                </div>
+              </div>
+
+              <form
+                className="provider-payment-form"
+                onSubmit={handlePaymentDetailsSubmit}
+              >
+                <div className="provider-form-grid provider-payment-form-grid">
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="bankName">Bank Name</label>
+                    <input
+                      id="bankName"
+                      name="bankName"
+                      type="text"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.bankName}
+                      onChange={handlePaymentDetailsChange}
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="accountName">Account Name</label>
+                    <input
+                      id="accountName"
+                      name="accountName"
+                      type="text"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.accountName}
+                      onChange={handlePaymentDetailsChange}
+                      maxLength={150}
+                    />
+                  </div>
+
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="accountNumber">Account Number</label>
+                    <input
+                      id="accountNumber"
+                      name="accountNumber"
+                      type="text"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.accountNumber}
+                      onChange={handlePaymentDetailsChange}
+                      maxLength={30}
+                      inputMode="numeric"
+                    />
+                  </div>
+
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="accountType">Account Type</label>
+                    <select
+                      id="accountType"
+                      name="accountType"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.accountType}
+                      onChange={handlePaymentDetailsChange}
+                    >
+                      <option value="">Select account type</option>
+                      <option value="savings">Savings</option>
+                      <option value="current">Current</option>
+                      <option value="corporate">Corporate</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="preferredPaymentMethod">
+                      Preferred Payment Method
+                    </label>
+                    <select
+                      id="preferredPaymentMethod"
+                      name="preferredPaymentMethod"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.preferredPaymentMethod}
+                      onChange={handlePaymentDetailsChange}
+                    >
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="cash">Cash</option>
+                      <option value="cheque">Cheque</option>
+                      <option value="wallet">Wallet</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div className="provider-form-field provider-form-group">
+                    <label htmlFor="paystackRecipientCode">
+                      Paystack Recipient Code{" "}
+                      <span className="provider-payment-field-hint">
+                        (optional, future use)
+                      </span>
+                    </label>
+                    <input
+                      id="paystackRecipientCode"
+                      name="paystackRecipientCode"
+                      type="text"
+                      className="provider-form-control"
+                      value={paymentDetailsForm.paystackRecipientCode}
+                      onChange={handlePaymentDetailsChange}
+                      maxLength={120}
+                    />
+                  </div>
+                </div>
+
+                {paymentError ? (
+                  <div className="provider-payment-feedback provider-payment-feedback-error" role="alert">
+                    {paymentError}
+                  </div>
+                ) : null}
+
+                {paymentFeedback ? (
+                  <div className="provider-payment-feedback provider-payment-feedback-success" role="status">
+                    {paymentFeedback}
+                  </div>
+                ) : null}
+
+                <div className="provider-form-actions provider-payment-actions">
+                  <button
+                    type="submit"
+                    disabled={paymentSubmitting}
+                    className="provider-submit-button"
+                  >
+                    {paymentSubmitting
+                      ? "Saving Payment Information..."
+                      : "Save Payment Information"}
+                  </button>
+                </div>
+              </form>
+            </section>
+          ) : null}
         </>
       )}
     </section>
@@ -999,4 +1367,42 @@ function getDialablePhone(phone = "") {
   }
 
   return hasPlusPrefix ? `+${digitsOnly}` : digitsOnly;
+}
+
+function buildPaymentDetailsForm(paymentDetails = {}) {
+  return {
+    bankName: paymentDetails.bankName || "",
+    accountName: paymentDetails.accountName || "",
+    accountNumber: paymentDetails.accountNumber || "",
+    accountType: paymentDetails.accountType || "",
+    preferredPaymentMethod:
+      paymentDetails.preferredPaymentMethod || "bank_transfer",
+    paystackRecipientCode: paymentDetails.paystackRecipientCode || "",
+  };
+}
+
+function maskAccountNumber(accountNumber = "") {
+  const digitsOnly = String(accountNumber || "").replace(/\D/g, "");
+
+  if (!digitsOnly) {
+    return "";
+  }
+
+  if (digitsOnly.length <= 4) {
+    return digitsOnly;
+  }
+
+  return `${"*".repeat(Math.max(digitsOnly.length - 4, 2))}${digitsOnly.slice(-4)}`;
+}
+
+function formatPaymentDetailLabel(value = "") {
+  if (!value) {
+    return "";
+  }
+
+  return String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
