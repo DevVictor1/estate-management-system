@@ -736,6 +736,12 @@ button:hover {
   gap: 20px;
 }
 
+.landing-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
 .landing-feature-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -751,6 +757,17 @@ button:hover {
 
 .landing-why-card {
   padding: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 24px 48px rgba(2, 8, 23, 0.16);
+}
+
+.landing-workflow-step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.05);
@@ -793,6 +810,59 @@ button:hover {
 
 .landing-why-card-text {
   margin-top: 14px;
+  line-height: 1.7;
+  color: rgba(216, 228, 243, 0.78);
+}
+
+.landing-workflow-section {
+  padding-top: 20px;
+  padding-bottom: 42px;
+}
+
+.landing-workflow-step-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.landing-workflow-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #a9c7ff;
+  font-size: 1rem;
+}
+
+.landing-workflow-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #8ab4ff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.landing-workflow-step-title {
+  font-size: 1.06rem;
+  font-weight: 740;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.landing-workflow-step-text {
+  margin: 0;
   line-height: 1.7;
   color: rgba(216, 228, 243, 0.78);
 }
@@ -4705,6 +4775,10 @@ button:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .landing-workflow-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .landing-role-grid {
     grid-template-columns: 1fr;
   }
@@ -4920,9 +4994,23 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .landing-workflow-grid {
+    grid-template-columns: 1fr;
+  }
+
   .landing-why-card {
     padding: 22px 20px;
     border-radius: 22px;
+  }
+
+  .landing-workflow-step {
+    padding: 22px 20px;
+    border-radius: 22px;
+  }
+
+  .landing-workflow-marker {
+    width: 44px;
+    height: 44px;
   }
 
   .landing-cta-card {

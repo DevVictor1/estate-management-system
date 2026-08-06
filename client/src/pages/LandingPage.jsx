@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   FaArrowRight,
   FaChartLine,
+  FaCircleCheck,
   FaClipboardCheck,
   FaFileContract,
   FaFileInvoiceDollar,
@@ -119,6 +120,58 @@ const whyChooseCards = [
     description:
       "Manage quotations, contracts, payment records, payment status, and supporting payment evidence with clear visibility.",
     icon: FaMoneyBillWave,
+  },
+];
+
+const workflowSteps = [
+  {
+    step: "01",
+    title: "Complaint Submitted",
+    description:
+      "A resident reports an issue and may attach supporting photos.",
+    icon: FaTriangleExclamation,
+  },
+  {
+    step: "02",
+    title: "Task Assigned",
+    description:
+      "An administrator reviews the complaint and assigns the task to a suitable service provider.",
+    icon: FaClipboardCheck,
+  },
+  {
+    step: "03",
+    title: "Quotation Submitted",
+    description:
+      "The assigned provider submits labour, material, and other estimated costs.",
+    icon: FaFileInvoiceDollar,
+  },
+  {
+    step: "04",
+    title: "Quotation Approved",
+    description:
+      "The administrator reviews the quotation and approves it or requests a revision.",
+    icon: FaCircleCheck,
+  },
+  {
+    step: "05",
+    title: "Contract Created",
+    description:
+      "An approved quotation can be used to create a formal service contract.",
+    icon: FaFileContract,
+  },
+  {
+    step: "06",
+    title: "Payment Processed",
+    description:
+      "The administrator records the payment and may attach supporting payment evidence.",
+    icon: FaMoneyBillWave,
+  },
+  {
+    step: "07",
+    title: "Service Completed",
+    description:
+      "The provider completes the assigned work and the task is closed in the system.",
+    icon: FaCircleCheck,
   },
 ];
 
@@ -321,6 +374,38 @@ function LandingPage() {
                   </span>
                   <h3 className="landing-why-card-title">{title}</h3>
                   <p className="landing-why-card-text">{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-workflow-section">
+          <div className="landing-section-shell">
+            <div className="landing-section-heading landing-workflow-header">
+              <p className="landing-eyebrow">Workflow Overview</p>
+              <h2>How EstateHub Works</h2>
+              <p>
+                From complaint submission to service completion, EstateHub
+                provides a structured workflow that improves accountability,
+                transparency, and service coordination within residential
+                communities.
+              </p>
+            </div>
+
+            <div className="landing-workflow-grid">
+              {workflowSteps.map(({ step, title, description, icon: Icon }) => (
+                <article key={step} className="landing-workflow-step">
+                  <div className="landing-workflow-step-top">
+                    <span className="landing-workflow-marker" aria-hidden="true">
+                      <Icon />
+                    </span>
+                    <span className="landing-workflow-step-number">
+                      Step {step}
+                    </span>
+                  </div>
+                  <h3 className="landing-workflow-step-title">{title}</h3>
+                  <p className="landing-workflow-step-text">{description}</p>
                 </article>
               ))}
             </div>
