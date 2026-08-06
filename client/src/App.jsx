@@ -10,6 +10,7 @@ import Complaints from "./pages/Complaints";
 import Contracts from "./pages/Contracts";
 import Dashboard from "./pages/Dashboard";
 import ForgotPassword from "./pages/ForgotPassword";
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Payments from "./pages/Payments";
 import Quotations from "./pages/Quotations";
@@ -23,7 +24,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
