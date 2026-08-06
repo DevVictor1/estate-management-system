@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   FaArrowRight,
@@ -98,6 +98,14 @@ const roleCards = [
 
 function LandingPage() {
   const [navigationOpen, setNavigationOpen] = useState(false);
+
+  useEffect(() => {
+    document.body.classList.add("landing-page-active");
+
+    return () => {
+      document.body.classList.remove("landing-page-active");
+    };
+  }, []);
 
   const closeNavigation = () => {
     setNavigationOpen(false);
