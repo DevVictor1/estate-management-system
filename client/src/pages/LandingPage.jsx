@@ -95,6 +95,33 @@ const roleCards = [
   },
 ];
 
+const whyChooseCards = [
+  {
+    title: "Centralized Records",
+    description:
+      "Keep complaints, tasks, quotations, contracts, payments, and service-provider information in one secure platform.",
+    icon: FaFileContract,
+  },
+  {
+    title: "Clear Accountability",
+    description:
+      "Track responsibilities, updates, approvals, and service activities clearly across the estate management workflow.",
+    icon: FaClipboardCheck,
+  },
+  {
+    title: "Secure Role-Based Access",
+    description:
+      "Residents, service providers, and administrators access only the information and actions relevant to their roles.",
+    icon: FaShieldHeart,
+  },
+  {
+    title: "Transparent Payment Tracking",
+    description:
+      "Manage quotations, contracts, payment records, payment status, and supporting payment evidence with clear visibility.",
+    icon: FaMoneyBillWave,
+  },
+];
+
 function LandingPage() {
   const [navigationOpen, setNavigationOpen] = useState(false);
 
@@ -268,6 +295,32 @@ function LandingPage() {
                   </span>
                   <h3>{title}</h3>
                   <p>{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-why-section">
+          <div className="landing-section-shell">
+            <div className="landing-section-heading landing-why-header">
+              <p className="landing-eyebrow">Why EstateHub</p>
+              <h2>Why Choose EstateHub?</h2>
+              <p>
+                EstateHub simplifies estate operations by providing a secure,
+                organized, and transparent platform for managing residential
+                community services.
+              </p>
+            </div>
+
+            <div className="landing-why-grid">
+              {whyChooseCards.map(({ title, description, icon: Icon }) => (
+                <article key={title} className="landing-why-card">
+                  <span className="landing-why-icon" aria-hidden="true">
+                    <Icon />
+                  </span>
+                  <h3 className="landing-why-card-title">{title}</h3>
+                  <p className="landing-why-card-text">{description}</p>
                 </article>
               ))}
             </div>

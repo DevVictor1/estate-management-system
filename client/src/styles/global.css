@@ -730,6 +730,12 @@ button:hover {
   gap: 18px;
 }
 
+.landing-why-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
 .landing-feature-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -743,10 +749,31 @@ button:hover {
   padding: 24px;
 }
 
+.landing-why-card {
+  padding: 26px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 24px 48px rgba(2, 8, 23, 0.16);
+}
+
 .landing-feature-icon {
   width: 50px;
   height: 50px;
   margin-bottom: 18px;
+  font-size: 1.08rem;
+}
+
+.landing-why-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+  border-radius: 18px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #a9c7ff;
   font-size: 1.08rem;
 }
 
@@ -755,6 +782,24 @@ button:hover {
   font-size: 1.08rem;
   font-weight: 740;
   letter-spacing: -0.02em;
+}
+
+.landing-why-card-title {
+  font-size: 1.08rem;
+  font-weight: 740;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.landing-why-card-text {
+  margin-top: 14px;
+  line-height: 1.7;
+  color: rgba(216, 228, 243, 0.78);
+}
+
+.landing-why-section {
+  padding-top: 18px;
+  padding-bottom: 42px;
 }
 
 .landing-section-roles {
@@ -4656,6 +4701,10 @@ button:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .landing-why-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .landing-role-grid {
     grid-template-columns: 1fr;
   }
@@ -4865,6 +4914,15 @@ button:hover {
 
   .landing-feature-grid {
     grid-template-columns: 1fr;
+  }
+
+  .landing-why-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-why-card {
+    padding: 22px 20px;
+    border-radius: 22px;
   }
 
   .landing-cta-card {
