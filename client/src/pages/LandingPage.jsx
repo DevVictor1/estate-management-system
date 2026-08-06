@@ -13,7 +13,6 @@ import {
   FaUsersGear,
 } from "react-icons/fa6";
 import estateHubIcon from "../assets/branding/estatehub-icon.png";
-import estateHubLogo from "../assets/branding/estatehub-logo.png";
 
 const featureCards = [
   {
@@ -121,11 +120,6 @@ function LandingPage() {
             aria-label="EstateHub home"
             onClick={closeNavigation}
           >
-            <img
-              src={estateHubLogo}
-              alt="EstateHub logo"
-              className="landing-brand-logo landing-brand-logo-full"
-            />
             <img
               src={estateHubIcon}
               alt="EstateHub icon"

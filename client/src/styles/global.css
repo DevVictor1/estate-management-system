@@ -434,8 +434,8 @@ button:hover {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  min-height: 88px;
-  padding: 16px 0;
+  min-height: 92px;
+  padding: 14px 0;
 }
 
 .landing-brand {
@@ -451,33 +451,28 @@ button:hover {
   object-fit: contain;
 }
 
-.landing-brand-logo-full {
-  width: 158px;
-  height: auto;
-}
-
 .landing-brand-logo-icon {
-  display: none;
-  width: 48px;
-  height: 48px;
+  display: block;
+  width: 58px;
+  height: 58px;
 }
 
 .landing-brand-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 
 .landing-brand-copy strong {
-  font-size: 1.05rem;
+  font-size: 1.18rem;
   font-weight: 760;
   letter-spacing: -0.02em;
   color: #ffffff;
 }
 
 .landing-brand-copy span {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   color: rgba(216, 228, 243, 0.72);
 }
 
@@ -541,8 +536,8 @@ button:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  padding: 12px 18px;
+  min-height: 44px;
+  padding: 11px 17px;
   border-radius: 14px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -573,7 +568,7 @@ button:hover {
 }
 
 .landing-hero {
-  padding-top: 54px;
+  padding-top: 34px;
   padding-bottom: 56px;
 }
 
@@ -4829,12 +4824,18 @@ button:hover {
     display: none;
   }
 
-  .landing-brand-logo-icon {
-    display: block;
+  .landing-brand-copy strong {
+    font-size: 1.04rem;
   }
 
-  .landing-brand-copy strong {
-    font-size: 1rem;
+  .landing-brand-logo-icon {
+    width: 50px;
+    height: 50px;
+  }
+
+  .landing-header-shell {
+    min-height: 82px;
+    padding: 12px 0;
   }
 
   .landing-hero-copy,
