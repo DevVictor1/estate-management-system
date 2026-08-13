@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
+import AppLoadingScreen from "./AppLoadingScreen";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -82,7 +83,7 @@ function ProtectedRoute({ allowedRoles }) {
   }, [user]);
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <AppLoadingScreen />;
   }
 
   if (!user) {
@@ -90,11 +91,11 @@ function ProtectedRoute({ allowedRoles }) {
   }
 
   if (isClearingUnverifiedSession || user.emailVerified === false) {
-    return <p>Loading...</p>;
+    return <AppLoadingScreen />;
   }
 
   if (providerStatusLoading) {
-    return <p>Loading...</p>;
+    return <AppLoadingScreen />;
   }
 
   if (user.role === "service_provider" && !isApprovedServiceProvider) {
