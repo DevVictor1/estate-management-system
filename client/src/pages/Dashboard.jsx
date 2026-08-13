@@ -103,6 +103,12 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
 
 const dayInMs = 24 * 60 * 60 * 1000;
 const contractExpiringWindowInDays = 30;
+const adminPrimaryOverviewLabels = new Set([
+  "Total Service Providers",
+  "Open Complaints",
+  "Active Tasks",
+  "Active Contracts",
+]);
 
 function Dashboard() {
   const { user } = useAuth();
@@ -493,6 +499,22 @@ function Dashboard() {
       },
     ],
     [adminOverview, analytics, stats]
+  );
+
+  const adminPrimaryStatCards = useMemo(
+    () =>
+      adminStatCards.filter((card) =>
+        adminPrimaryOverviewLabels.has(card.label)
+      ),
+    [adminStatCards]
+  );
+
+  const adminOperationalStatCards = useMemo(
+    () =>
+      adminStatCards.filter(
+        (card) => !adminPrimaryOverviewLabels.has(card.label)
+      ),
+    [adminStatCards]
   );
 
   const charts = analytics?.charts || initialAnalytics.charts;
@@ -1155,8 +1177,8 @@ function Dashboard() {
           </div>
         </div>
 
-        <div className="admin-stat-grid">
-          {adminStatCards.map((card) => {
+        <div className="admin-primary-stat-grid">
+          {adminPrimaryStatCards.map((card) => {
             const Icon = card.icon;
 
             return (
@@ -1175,6 +1197,47 @@ function Dashboard() {
               </article>
             );
           })}
+        </div>
+
+        <div className="admin-operational-status">
+          <div className="admin-operational-status-header">
+            <div>
+              <h3>Operational Status</h3>
+              <p>
+                Secondary activity counts that still need regular monitoring.
+              </p>
+            </div>
+          </div>
+
+          <div className="admin-operational-status-grid">
+            {adminOperationalStatCards.map((card) => {
+              const Icon = card.icon;
+
+              return (
+                <article
+                  key={card.label}
+                  className={`admin-operational-status-item admin-operational-status-item-${card.tone}`}
+                >
+                  <span className="admin-operational-status-icon">
+                    <Icon />
+                  </span>
+                  <div className="admin-operational-status-content">
+                    <div className="admin-operational-status-top">
+                      <span className="admin-operational-status-label">
+                        {card.label}
+                      </span>
+                      <strong className="admin-operational-status-value">
+                        {card.value}
+                      </strong>
+                    </div>
+                    <p className="admin-operational-status-helper">
+                      {card.helper}
+                    </p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 

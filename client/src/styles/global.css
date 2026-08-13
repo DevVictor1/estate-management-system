@@ -3767,6 +3767,13 @@ button:hover {
   align-items: stretch;
 }
 
+.admin-primary-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
 .admin-stat-card {
   display: flex;
   flex-direction: column;
@@ -3843,6 +3850,112 @@ button:hover {
 }
 
 .admin-stat-card-danger .admin-stat-icon {
+  background: var(--danger-soft);
+  color: var(--danger-text);
+}
+
+.admin-operational-status {
+  margin-top: 20px;
+  padding: 20px 18px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 22px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.admin-operational-status-header h3 {
+  font-size: 1rem;
+  font-weight: 740;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+
+.admin-operational-status-header p {
+  margin-top: 6px;
+  max-width: 560px;
+}
+
+.admin-operational-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-operational-status-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.admin-operational-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  background: rgba(219, 234, 254, 0.9);
+  color: var(--accent-strong);
+  font-size: 0.98rem;
+}
+
+.admin-operational-status-content {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-operational-status-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-operational-status-value {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-main);
+}
+
+.admin-operational-status-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.admin-operational-status-helper {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--text-muted) !important;
+}
+
+.admin-operational-status-item-success .admin-operational-status-icon {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+.admin-operational-status-item-warning .admin-operational-status-icon {
+  background: var(--warning-soft);
+  color: var(--warning-text);
+}
+
+.admin-operational-status-item-danger .admin-operational-status-icon {
   background: var(--danger-soft);
   color: var(--danger-text);
 }
@@ -4878,6 +4991,10 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .admin-primary-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .dashboard-chart-grid,
   .provider-dashboard-chart-grid {
     grid-template-columns: 1fr;
@@ -5373,8 +5490,24 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .admin-primary-stat-grid,
   .admin-stat-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .admin-operational-status {
+    padding: 18px 16px;
+    border-radius: 20px;
+  }
+
+  .admin-operational-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-operational-status-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
   }
 
   .service-providers-page .provider-mobile-card .provider-action-row {
