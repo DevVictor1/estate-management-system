@@ -2,71 +2,28 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   FaArrowRight,
-  FaChartLine,
   FaCircleCheck,
   FaClipboardCheck,
   FaFileContract,
   FaFileInvoiceDollar,
   FaMoneyBillWave,
-  FaReceipt,
-  FaShieldHeart,
   FaTriangleExclamation,
-  FaUsersGear,
 } from "react-icons/fa6";
 import estateHubIcon from "../assets/branding/estatehub-icon.png";
+import dashboardImage from "../assets/product/dashboard.png";
+import quotationsImage from "../assets/product/quotations.png";
+import serviceProviderImage from "../assets/product/serviceprovider.jpg";
+import tasksImage from "../assets/product/tasks.png";
 
-const featureCards = [
-  {
-    title: "Complaint Management",
-    description:
-      "Capture resident issues quickly and keep every complaint visible from submission to resolution.",
-    icon: FaTriangleExclamation,
-  },
-  {
-    title: "Task Assignment",
-    description:
-      "Turn operational issues into accountable tasks with clear ownership, deadlines, and updates.",
-    icon: FaClipboardCheck,
-  },
-  {
-    title: "Service Provider Management",
-    description:
-      "Maintain trusted provider records, verification status, and operational contact details in one place.",
-    icon: FaUsersGear,
-  },
-  {
-    title: "Quotation Workflow",
-    description:
-      "Review provider quotations, manage revisions, and support approval decisions with a structured process.",
-    icon: FaFileInvoiceDollar,
-  },
-  {
-    title: "Contract Management",
-    description:
-      "Create and monitor provider contracts with reliable history, scope, and financial context.",
-    icon: FaFileContract,
-  },
-  {
-    title: "Payment Tracking",
-    description:
-      "Record staged payments, track financial progress, and keep payment records organized and auditable.",
-    icon: FaMoneyBillWave,
-  },
-  {
-    title: "Payment Evidence",
-    description:
-      "Attach proof of payment securely so administrators and providers can reference the same record.",
-    icon: FaReceipt,
-  },
-  {
-    title: "Dashboard Analytics",
-    description:
-      "Surface complaint, task, quotation, contract, and payment activity through role-aware operational insights.",
-    icon: FaChartLine,
-  },
+const workflowSteps = [
+  { label: "Complaint", icon: FaTriangleExclamation },
+  { label: "Task", icon: FaClipboardCheck },
+  { label: "Quotation", icon: FaFileInvoiceDollar },
+  { label: "Contract", icon: FaFileContract },
+  { label: "Payment", icon: FaMoneyBillWave },
 ];
 
-const roleCards = [
+const roleGroups = [
   {
     title: "Resident",
     points: [
@@ -96,82 +53,26 @@ const roleCards = [
   },
 ];
 
-const whyChooseCards = [
+const trustHighlights = [
   {
     title: "Centralized Records",
     description:
-      "Keep complaints, tasks, quotations, contracts, payments, and service-provider information in one secure platform.",
-    icon: FaFileContract,
+      "Keep complaints, tasks, quotations, contracts, payments, and provider information in one place.",
   },
   {
     title: "Clear Accountability",
     description:
-      "Track responsibilities, updates, approvals, and service activities clearly across the estate management workflow.",
-    icon: FaClipboardCheck,
+      "Track assignments, approvals, deadlines, and status changes across the entire workflow.",
   },
   {
     title: "Secure Role-Based Access",
     description:
-      "Residents, service providers, and administrators access only the information and actions relevant to their roles.",
-    icon: FaShieldHeart,
+      "Residents, service providers, and administrators see only the actions and data meant for them.",
   },
   {
     title: "Transparent Payment Tracking",
     description:
-      "Manage quotations, contracts, payment records, payment status, and supporting payment evidence with clear visibility.",
-    icon: FaMoneyBillWave,
-  },
-];
-
-const workflowSteps = [
-  {
-    step: "01",
-    title: "Complaint Submitted",
-    description:
-      "A resident reports an issue and may attach supporting photos.",
-    icon: FaTriangleExclamation,
-  },
-  {
-    step: "02",
-    title: "Task Assigned",
-    description:
-      "An administrator reviews the complaint and assigns the task to a suitable service provider.",
-    icon: FaClipboardCheck,
-  },
-  {
-    step: "03",
-    title: "Quotation Submitted",
-    description:
-      "The assigned provider submits labour, material, and other estimated costs.",
-    icon: FaFileInvoiceDollar,
-  },
-  {
-    step: "04",
-    title: "Quotation Approved",
-    description:
-      "The administrator reviews the quotation and approves it or requests a revision.",
-    icon: FaCircleCheck,
-  },
-  {
-    step: "05",
-    title: "Contract Created",
-    description:
-      "An approved quotation can be used to create a formal service contract.",
-    icon: FaFileContract,
-  },
-  {
-    step: "06",
-    title: "Payment Processed",
-    description:
-      "The administrator records the payment and may attach supporting payment evidence.",
-    icon: FaMoneyBillWave,
-  },
-  {
-    step: "07",
-    title: "Service Completed",
-    description:
-      "The provider completes the assigned work and the task is closed in the system.",
-    icon: FaCircleCheck,
+      "Record payment stages, supporting evidence, and contract progress without losing audit context.",
   },
 ];
 
@@ -207,7 +108,7 @@ function LandingPage() {
             />
             <div className="landing-brand-copy">
               <strong>EstateHub</strong>
-              <span>Smart Estate Operations Platform</span>
+              <span>Estate Service Provider &amp; Contractor Management System</span>
             </div>
           </Link>
 
@@ -266,11 +167,11 @@ function LandingPage() {
           <div className="landing-hero-shell">
             <div className="landing-hero-copy">
               <p className="landing-eyebrow">EstateHub</p>
-              <h1>Estate Management, Simplified.</h1>
+              <h1>Residential estate operations in one working system.</h1>
               <p className="landing-hero-text">
-                EstateHub brings complaints, tasks, service providers,
-                quotations, contracts, payments, and operational records into
-                one secure platform for residential communities.
+                Manage complaints, task assignments, service providers,
+                quotations, contracts, payments, and supporting records from one
+                secure platform built for residential communities.
               </p>
 
               <div className="landing-hero-actions">
@@ -284,151 +185,171 @@ function LandingPage() {
                   to="/register?role=resident"
                   className="landing-button landing-button-secondary"
                 >
-                  Register as a Resident
+                  Register as Resident
                 </Link>
               </div>
 
+              <div className="landing-hero-highlights" aria-label="Platform areas">
+                <span>Complaints</span>
+                <span>Tasks</span>
+                <span>Quotations</span>
+                <span>Contracts</span>
+                <span>Payments</span>
+              </div>
+
               <p className="landing-hero-note">
-                Admin and service-provider accounts are created securely by
-                authorized management.
+                Admin and service-provider accounts are created securely through
+                the platform&apos;s existing management workflow.
               </p>
             </div>
 
-            <div className="landing-hero-panel" aria-label="EstateHub overview">
-              <div className="landing-hero-panel-card">
-                <div className="landing-hero-panel-header">
-                  <span className="landing-hero-panel-icon">
-                    <FaShieldHeart />
-                  </span>
-                  <div>
-                    <h2>Secure, role-aware operations</h2>
-                    <p>
-                      Coordinate complaints, provider work, quotations, and
-                      payments with structured access for each user type.
-                    </p>
-                  </div>
+            <div className="landing-hero-visual">
+              <div className="landing-product-frame landing-product-frame-hero">
+                <div className="landing-product-frame-bar" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
                 </div>
-
-                <div className="landing-hero-panel-list">
-                  <div className="landing-hero-panel-item">
-                    <strong>Residents</strong>
-                    <span>Submit issues and stay informed.</span>
-                  </div>
-                  <div className="landing-hero-panel-item">
-                    <strong>Service Providers</strong>
-                    <span>Respond to assigned work and pricing requests.</span>
-                  </div>
-                  <div className="landing-hero-panel-item">
-                    <strong>Administrators</strong>
-                    <span>Oversee delivery, approvals, and payment records.</span>
-                  </div>
-                </div>
+                <img
+                  src={dashboardImage}
+                  alt="EstateHub dashboard overview"
+                  className="landing-product-image"
+                />
               </div>
             </div>
           </div>
         </section>
 
-        <section id="features" className="landing-section">
+        <section id="features" className="landing-section landing-workflow-section">
           <div className="landing-section-shell">
-            <div className="landing-section-heading">
-              <p className="landing-eyebrow">Core Capabilities</p>
-              <h2>One platform for estate operations and contractor workflow</h2>
+            <div className="landing-section-heading landing-workflow-heading">
+              <p className="landing-eyebrow">Operational Flow</p>
+              <h2>A clear path from reported issue to documented payment</h2>
               <p>
-                EstateHub is designed to reduce fragmentation by connecting
-                service requests, provider coordination, commercial approvals,
-                and payment records in one place.
+                EstateHub keeps operational work moving through a practical
+                sequence so complaints, approvals, commercial decisions, and
+                provider delivery stay connected.
               </p>
             </div>
 
-            <div className="landing-feature-grid">
-              {featureCards.map(({ title, description, icon: Icon }) => (
-                <article key={title} className="landing-feature-card">
-                  <span className="landing-feature-icon" aria-hidden="true">
-                    <Icon />
-                  </span>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="landing-section landing-why-section">
-          <div className="landing-section-shell">
-            <div className="landing-section-heading landing-why-header">
-              <p className="landing-eyebrow">Why EstateHub</p>
-              <h2>Why Choose EstateHub?</h2>
-              <p>
-                EstateHub simplifies estate operations by providing a secure,
-                organized, and transparent platform for managing residential
-                community services.
-              </p>
-            </div>
-
-            <div className="landing-why-grid">
-              {whyChooseCards.map(({ title, description, icon: Icon }) => (
-                <article key={title} className="landing-why-card">
-                  <span className="landing-why-icon" aria-hidden="true">
-                    <Icon />
-                  </span>
-                  <h3 className="landing-why-card-title">{title}</h3>
-                  <p className="landing-why-card-text">{description}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="landing-section landing-workflow-section">
-          <div className="landing-section-shell">
-            <div className="landing-section-heading landing-workflow-header">
-              <p className="landing-eyebrow">Workflow Overview</p>
-              <h2>How EstateHub Works</h2>
-              <p>
-                From complaint submission to service completion, EstateHub
-                provides a structured workflow that improves accountability,
-                transparency, and service coordination within residential
-                communities.
-              </p>
-            </div>
-
-            <div className="landing-workflow-grid">
-              {workflowSteps.map(({ step, title, description, icon: Icon }) => (
-                <article key={step} className="landing-workflow-step">
-                  <div className="landing-workflow-step-top">
-                    <span className="landing-workflow-marker" aria-hidden="true">
+            <div className="landing-workflow-strip" aria-label="EstateHub workflow">
+              {workflowSteps.map(({ label, icon: Icon }, index) => (
+                <div key={label} className="landing-workflow-node">
+                  <div className="landing-workflow-step">
+                    <span className="landing-workflow-icon" aria-hidden="true">
                       <Icon />
                     </span>
-                    <span className="landing-workflow-step-number">
-                      Step {step}
-                    </span>
+                    <span>{label}</span>
                   </div>
-                  <h3 className="landing-workflow-step-title">{title}</h3>
-                  <p className="landing-workflow-step-text">{description}</p>
-                </article>
+                  {index < workflowSteps.length - 1 ? (
+                    <span className="landing-workflow-arrow" aria-hidden="true">
+                      <FaArrowRight />
+                    </span>
+                  ) : null}
+                </div>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="landing-section landing-section-roles">
-          <div className="landing-section-shell">
-            <div className="landing-section-heading">
-              <p className="landing-eyebrow">Role-Based Access</p>
-              <h2>Built for the people who keep residential communities running</h2>
+        <section className="landing-section landing-story-section">
+          <div className="landing-section-shell landing-story-shell">
+            <div className="landing-story-media">
+              <div className="landing-product-frame">
+                <img
+                  src={tasksImage}
+                  alt="EstateHub tasks interface"
+                  className="landing-product-image"
+                />
+              </div>
+            </div>
+
+            <div className="landing-story-content">
+              <p className="landing-story-kicker">Task Management</p>
+              <h2>Assign work with clear priorities, deadlines, and follow-through</h2>
               <p>
-                EstateHub supports clear responsibilities for residents, service
-                providers, and estate administrators without exposing the wrong
-                data to the wrong audience.
+                Administrators can turn operational issues into trackable tasks,
+                assign the right service provider, and monitor progress without
+                losing visibility across the estate.
               </p>
+              <ul className="landing-story-list">
+                <li>Track priority, deadline, and current status in one place.</li>
+                <li>Keep provider responsibility tied directly to assigned work.</li>
+                <li>Maintain a clearer audit trail for updates and completion.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-story-section landing-story-section-alt">
+          <div className="landing-section-shell landing-story-shell landing-story-shell-reverse">
+            <div className="landing-story-content">
+              <p className="landing-story-kicker">Quotation Workflow</p>
+              <h2>Review provider pricing without leaving the operational process</h2>
+              <p>
+                Providers can submit quotations for assigned tasks, while
+                administrators review totals, request revisions, approve the
+                right version, and move confidently toward contract creation.
+              </p>
+              <ul className="landing-story-list">
+                <li>Keep revisions visible instead of overwriting earlier submissions.</li>
+                <li>Capture approval decisions and comments in a structured flow.</li>
+                <li>Bridge the gap between task delivery and contract setup.</li>
+              </ul>
+            </div>
+
+            <div className="landing-story-media">
+              <div className="landing-product-frame">
+                <img
+                  src={quotationsImage}
+                  alt="EstateHub quotations review interface"
+                  className="landing-product-image"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-story-section landing-people-section">
+          <div className="landing-section-shell landing-story-shell">
+            <div className="landing-story-media landing-story-media-photo">
+              <div className="landing-photo-frame">
+                <img
+                  src={serviceProviderImage}
+                  alt="Service provider on site managing facility operations"
+                  className="landing-photo-image"
+                />
+              </div>
+            </div>
+
+            <div className="landing-story-content">
+              <p className="landing-story-kicker">Service Provider Coordination</p>
+              <h2>Built for the people carrying work across the estate every day</h2>
+              <p>
+                EstateHub connects residents, administrators, and service
+                providers inside one workflow so reported issues, approvals,
+                commercial steps, and delivery updates do not drift apart.
+              </p>
+              <p className="landing-story-emphasis">
+                The result is a more accountable process for the people managing
+                estates and the people delivering the work.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="landing-section landing-role-section">
+          <div className="landing-section-shell">
+            <div className="landing-section-heading landing-role-heading">
+              <p className="landing-eyebrow">User Roles</p>
+              <h2>Designed for each part of the estate workflow</h2>
             </div>
 
             <div className="landing-role-grid">
-              {roleCards.map((role) => (
-                <article key={role.title} className="landing-role-card">
+              {roleGroups.map((role) => (
+                <article key={role.title} className="landing-role-column">
                   <h3>{role.title}</h3>
-                  <ul>
+                  <ul className="landing-role-list">
                     {role.points.map((point) => (
                       <li key={point}>
                         <FaArrowRight aria-hidden="true" />
@@ -442,15 +363,39 @@ function LandingPage() {
           </div>
         </section>
 
-        <section id="about" className="landing-section">
+        <section className="landing-section landing-trust-section">
+          <div className="landing-section-shell landing-trust-shell">
+            <div className="landing-trust-intro">
+              <p className="landing-eyebrow">Why EstateHub</p>
+              <h2>Practical controls for a process that usually gets fragmented</h2>
+            </div>
+
+            <div className="landing-trust-grid">
+              {trustHighlights.map((item) => (
+                <article key={item.title} className="landing-trust-item">
+                  <span className="landing-trust-icon" aria-hidden="true">
+                    <FaCircleCheck />
+                  </span>
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.description}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="about" className="landing-section landing-about-section">
           <div className="landing-section-shell">
-            <div className="landing-about-card">
+            <div className="landing-about-copy">
               <p className="landing-eyebrow">About EstateHub</p>
-              <h2>Designed for accountability, transparency, and service coordination</h2>
+              <h2>EstateHub centralizes service-provider and contractor operations for residential communities</h2>
               <p>
-                EstateHub is a web-based management platform designed to improve
-                accountability, transparency, communication, and service
-                coordination within residential communities.
+                It is a web-based management platform focused on accountability,
+                communication, and operational clarity across complaints, task
+                delivery, quotation review, contract tracking, and payment
+                records.
               </p>
             </div>
           </div>
@@ -458,13 +403,14 @@ function LandingPage() {
 
         <section className="landing-section landing-section-cta">
           <div className="landing-section-shell">
-            <div className="landing-cta-card">
-              <div>
+            <div className="landing-cta-panel">
+              <div className="landing-cta-copy">
                 <p className="landing-eyebrow">Get Started</p>
                 <h2>Ready to access EstateHub?</h2>
                 <p>
-                  Sign in to continue your work, or create a resident account to
-                  start submitting and tracking estate complaints.
+                  Sign in to continue your work, register as a resident to start
+                  reporting issues, or join as a service provider through the
+                  existing registration flow.
                 </p>
               </div>
 
