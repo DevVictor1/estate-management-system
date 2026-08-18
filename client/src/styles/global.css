@@ -640,13 +640,13 @@ button:hover {
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 0.94fr) minmax(360px, 1.06fr);
+  grid-template-columns: minmax(0, 0.84fr) minmax(380px, 1.16fr);
   gap: clamp(28px, 4vw, 54px);
   align-items: center;
 }
 
 .landing-hero-copy {
-  max-width: 520px;
+  max-width: 500px;
 }
 
 .landing-eyebrow {
@@ -659,8 +659,8 @@ button:hover {
 }
 
 .landing-hero-copy h1 {
-  max-width: 12ch;
-  font-size: clamp(2.9rem, 6vw, 5.2rem);
+  max-width: 14ch;
+  font-size: clamp(2.4rem, 5.1vw, 4.25rem);
   line-height: 0.98;
   letter-spacing: -0.055em;
   color: #ffffff;
@@ -748,7 +748,7 @@ button:hover {
 }
 
 .landing-product-frame-hero {
-  max-width: 700px;
+  max-width: 760px;
 }
 
 .landing-product-frame-bar {
