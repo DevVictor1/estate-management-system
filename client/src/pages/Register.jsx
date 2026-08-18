@@ -1,8 +1,17 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import AuthBranding from "../components/AuthBranding";
+
+const allowedRegistrationRoles = new Set(["resident", "service_provider"]);
+
+const getSafeRegistrationRole = (value) => {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+  return allowedRegistrationRoles.has(normalizedValue)
+    ? normalizedValue
+    : "resident";
+};
 
 const initialFormData = {
   fullName: "",
@@ -19,7 +28,12 @@ const initialFormData = {
 
 function Register() {
   const { register } = useAuth();
-  const [formData, setFormData] = useState(initialFormData);
+  const [searchParams] = useSearchParams();
+  const requestedRole = getSafeRegistrationRole(searchParams.get("role"));
+  const [formData, setFormData] = useState(() => ({
+    ...initialFormData,
+    role: requestedRole,
+  }));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successState, setSuccessState] = useState(null);
@@ -51,7 +65,7 @@ function Register() {
         response.data?.message ||
           "If an unverified account exists for that email, a new verification message has been sent."
       );
-    } catch (err) {
+    } catch {
       setResendMessage(
         "If an unverified account exists for that email, a new verification message has been sent."
       );
@@ -94,7 +108,10 @@ function Register() {
           response.message ||
           "Account created successfully. We sent a verification link to your email address.",
       });
-      setFormData(initialFormData);
+      setFormData({
+        ...initialFormData,
+        role: requestedRole,
+      });
     } catch (err) {
       setError(
         err.response?.data?.message ||

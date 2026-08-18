@@ -250,7 +250,7 @@ function LandingPage() {
                 Login
               </Link>
               <Link
-                to="/register"
+                to="/register?role=resident"
                 className="landing-button landing-button-primary"
                 onClick={closeNavigation}
               >
@@ -281,7 +281,7 @@ function LandingPage() {
                   Login to EstateHub
                 </Link>
                 <Link
-                  to="/register"
+                  to="/register?role=resident"
                   className="landing-button landing-button-secondary"
                 >
                   Register as a Resident
@@ -469,14 +469,20 @@ function LandingPage() {
               </div>
 
               <div className="landing-cta-actions">
-                <Link to="/login" className="landing-button landing-button-primary">
+                <Link to="/login" className="landing-button landing-button-secondary">
                   Login
                 </Link>
                 <Link
-                  to="/register"
-                  className="landing-button landing-button-secondary"
+                  to="/register?role=resident"
+                  className="landing-button landing-button-primary"
                 >
                   Register as Resident
+                </Link>
+                <Link
+                  to="/register?role=service_provider"
+                  className="landing-button landing-button-tertiary"
+                >
+                  Register as Service Provider
                 </Link>
               </div>
             </div>
