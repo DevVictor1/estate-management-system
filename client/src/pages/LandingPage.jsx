@@ -177,13 +177,13 @@ function LandingPage() {
               <div className="landing-hero-actions">
                 <Link
                   to="/login"
-                  className="landing-button landing-button-primary"
+                  className="landing-button landing-button-secondary"
                 >
                   Login to EstateHub
                 </Link>
                 <Link
                   to="/register?role=resident"
-                  className="landing-button landing-button-secondary"
+                  className="landing-button landing-button-primary"
                 >
                   Register as Resident
                 </Link>
