@@ -76,6 +76,15 @@ const providerReceiptIssueReasonLabels = {
   other: "Other",
 };
 
+const providerReceiptResolutionOutcomeLabels = {
+  payment_received: "Payment received",
+  bank_delay_resolved: "Bank delay resolved",
+  transfer_failed_or_reversed: "Transfer failed or reversed",
+  replacement_payment_required: "Replacement payment required",
+  amount_issue_resolved: "Amount issue resolved",
+  other: "Other",
+};
+
 const getProviderReceiptStatus = (payment) => {
   const status = String(payment?.providerReceipt?.status || "")
     .trim()
@@ -95,9 +104,37 @@ const formatProviderReceiptIssueReason = (reason) =>
     String(reason || "").trim().toLowerCase()
   ] || "Payment issue reported";
 
+const getProviderReceiptResolution = (payment) => {
+  const resolution = payment?.providerReceipt?.resolution || {};
+  const status = String(resolution.status || "").trim().toLowerCase();
+
+  return {
+    status: status === "resolved" ? "resolved" : "unresolved",
+    outcome: String(resolution.outcome || "").trim().toLowerCase(),
+    note: resolution.note || "",
+    resolvedAt: resolution.resolvedAt || null,
+    resolvedBy: resolution.resolvedBy || null,
+  };
+};
+
+const isProviderReceiptIssueResolved = (payment) =>
+  getProviderReceiptResolution(payment).status === "resolved";
+
+const formatProviderReceiptResolutionOutcome = (outcome) =>
+  providerReceiptResolutionOutcomeLabels[
+    String(outcome || "").trim().toLowerCase()
+  ] || "Resolution recorded";
+
 const getAdminReceiptConfirmationLabel = (payment) => {
   if (payment?.status !== "paid") {
     return "Unavailable until paid";
+  }
+
+  if (
+    isProviderReceiptIssueReported(payment) &&
+    isProviderReceiptIssueResolved(payment)
+  ) {
+    return "Resolved";
   }
 
   if (isProviderReceiptIssueReported(payment)) {
@@ -148,6 +185,12 @@ function Payments() {
   const [receiptIssueNote, setReceiptIssueNote] = useState("");
   const [receiptIssueError, setReceiptIssueError] = useState("");
   const [receiptIssueSubmitting, setReceiptIssueSubmitting] = useState(false);
+  const [receiptResolutionPaymentId, setReceiptResolutionPaymentId] = useState("");
+  const [receiptResolutionOutcome, setReceiptResolutionOutcome] = useState("");
+  const [receiptResolutionNote, setReceiptResolutionNote] = useState("");
+  const [receiptResolutionError, setReceiptResolutionError] = useState("");
+  const [receiptResolutionSubmitting, setReceiptResolutionSubmitting] =
+    useState(false);
   const [pageError, setPageError] = useState("");
   const [formError, setFormError] = useState("");
   const [warning, setWarning] = useState("");
@@ -162,6 +205,7 @@ function Payments() {
   const [evidenceSubmitting, setEvidenceSubmitting] = useState(false);
   const [evidenceDeleting, setEvidenceDeleting] = useState(false);
   const [evidencePreview, setEvidencePreview] = useState(null);
+  const paymentFormRef = useRef(null);
   const isAdmin = user?.role === "admin";
   const isServiceProvider = user?.role === "service_provider";
 
@@ -214,6 +258,14 @@ function Payments() {
     setReceiptIssueNote("");
     setReceiptIssueError("");
     setReceiptIssueSubmitting(false);
+  };
+
+  const closeReceiptResolutionModal = () => {
+    setReceiptResolutionPaymentId("");
+    setReceiptResolutionOutcome("");
+    setReceiptResolutionNote("");
+    setReceiptResolutionError("");
+    setReceiptResolutionSubmitting(false);
   };
 
   useEffect(() => {
@@ -325,6 +377,12 @@ function Payments() {
     () =>
       payments.find((payment) => payment._id === receiptIssuePaymentId) || null,
     [payments, receiptIssuePaymentId]
+  );
+  const selectedReceiptResolutionPayment = useMemo(
+    () =>
+      payments.find((payment) => payment._id === receiptResolutionPaymentId) ||
+      null,
+    [payments, receiptResolutionPaymentId]
   );
 
   const handleEdit = (payment) => {
@@ -617,6 +675,86 @@ function Payments() {
     } finally {
       setReceiptIssueSubmitting(false);
     }
+  };
+
+  const openReceiptResolutionModal = (payment) => {
+    if (!payment?._id || !isProviderReceiptIssueReported(payment)) {
+      return;
+    }
+
+    const existingResolution = getProviderReceiptResolution(payment);
+
+    setReceiptResolutionPaymentId(payment._id);
+    setReceiptResolutionOutcome(existingResolution.outcome || "");
+    setReceiptResolutionNote(existingResolution.note || "");
+    setReceiptResolutionError("");
+    dismissToast();
+  };
+
+  const handleReceiptResolutionSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!receiptResolutionPaymentId) {
+      return;
+    }
+
+    setReceiptResolutionSubmitting(true);
+    setReceiptResolutionError("");
+    setPageError("");
+    setFormError("");
+    setWarning("");
+    setFeedback("");
+    dismissToast();
+
+    try {
+      await api.patch(
+        `/api/payments/${receiptResolutionPaymentId}/resolve-receipt-issue`,
+        {
+          outcome: receiptResolutionOutcome,
+          note: receiptResolutionNote,
+        }
+      );
+      await fetchPageData();
+      closeReceiptResolutionModal();
+      setFeedback("Payment issue resolved successfully.");
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to resolve the payment issue."
+      );
+      setReceiptResolutionError(message);
+      showToast("Payment issue could not be resolved", message);
+    } finally {
+      setReceiptResolutionSubmitting(false);
+    }
+  };
+
+  const handleCreateReplacementPayment = (payment) => {
+    if (!payment?._id || !isAdmin) {
+      return;
+    }
+
+    setEditingPaymentId("");
+    setPageError("");
+    setFormError("");
+    setWarning("");
+    dismissToast();
+    closeReceiptResolutionModal();
+    setFormData({
+      ...initialFormData,
+      serviceProvider: payment.serviceProvider?._id || "",
+      contract: payment.contract?._id || "",
+    });
+    setFeedback(
+      "Review the original payment and enter the replacement payment details."
+    );
+
+    requestAnimationFrame(() => {
+      paymentFormRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
   };
 
   const openEvidenceModal = (payment) => {
@@ -1312,6 +1450,7 @@ function Payments() {
 
       {isAdmin ? (
         <form
+          ref={paymentFormRef}
           onSubmit={handleSubmit}
           className="payments-form"
           style={{
@@ -1759,7 +1898,12 @@ function Payments() {
                     </span>
                   </td>
                   <td style={cellStyle}>
-                    <PaymentReceiptSummary payment={payment} mode="admin" />
+                    <PaymentReceiptSummary
+                      payment={payment}
+                      mode="admin"
+                      onResolveIssue={openReceiptResolutionModal}
+                      onCreateReplacementPayment={handleCreateReplacementPayment}
+                    />
                   </td>
                   <td style={cellStyle}>{payment.referenceNumber || "-"}</td>
                   <td style={cellStyle}>{payment.notes || "-"}</td>
@@ -2035,6 +2179,126 @@ function Payments() {
         </div>
       ) : null}
 
+      {isAdmin && selectedReceiptResolutionPayment ? (
+        <div
+          className="payments-receipt-resolution-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="paymentReceiptResolutionTitle"
+          onClick={closeReceiptResolutionModal}
+        >
+          <div
+            className="payments-receipt-resolution-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payments-receipt-resolution-header">
+              <div>
+                <p className="payments-evidence-eyebrow">Payment Resolution</p>
+                <h2 id="paymentReceiptResolutionTitle">Resolve Payment Issue</h2>
+                <p>
+                  {selectedReceiptResolutionPayment.contract?.contractTitle ||
+                    "Contract Payment"}{" "}
+                  •{" "}
+                  {currencyFormatter.format(
+                    Number(selectedReceiptResolutionPayment.amount) || 0
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="payments-evidence-close"
+                onClick={closeReceiptResolutionModal}
+              >
+                Close
+              </button>
+            </div>
+
+            <form
+              className="payments-receipt-resolution-form"
+              onSubmit={handleReceiptResolutionSubmit}
+            >
+              <div className="payments-receipt-resolution-panel">
+                <label
+                  className="payments-evidence-label"
+                  htmlFor="paymentResolutionOutcome"
+                >
+                  Resolution Outcome
+                </label>
+                <select
+                  id="paymentResolutionOutcome"
+                  value={receiptResolutionOutcome}
+                  onChange={(event) =>
+                    setReceiptResolutionOutcome(event.target.value)
+                  }
+                  className="payments-receipt-resolution-input"
+                  disabled={receiptResolutionSubmitting}
+                >
+                  <option value="">Select a resolution outcome</option>
+                  {Object.entries(providerReceiptResolutionOutcomeLabels).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div className="payments-receipt-resolution-panel">
+                <label
+                  className="payments-evidence-label"
+                  htmlFor="paymentResolutionNote"
+                >
+                  Admin Note{" "}
+                  <span className="payments-receipt-resolution-optional">
+                    (Optional)
+                  </span>
+                </label>
+                <textarea
+                  id="paymentResolutionNote"
+                  value={receiptResolutionNote}
+                  onChange={(event) => setReceiptResolutionNote(event.target.value)}
+                  className="payments-receipt-resolution-textarea"
+                  rows={4}
+                  maxLength={1000}
+                  disabled={receiptResolutionSubmitting}
+                  placeholder="Add any brief note about how this issue was resolved."
+                />
+              </div>
+
+              {receiptResolutionError ? (
+                <div
+                  className="payments-form-alert payments-receipt-resolution-alert"
+                  role="alert"
+                >
+                  {receiptResolutionError}
+                </div>
+              ) : null}
+
+              <div className="payments-receipt-resolution-actions">
+                <button
+                  type="submit"
+                  className="payments-evidence-primary"
+                  disabled={receiptResolutionSubmitting}
+                >
+                  {receiptResolutionSubmitting
+                    ? "Saving..."
+                    : "Save Resolution"}
+                </button>
+                <button
+                  type="button"
+                  className="payments-evidence-secondary"
+                  onClick={closeReceiptResolutionModal}
+                  disabled={receiptResolutionSubmitting}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {evidencePreview ? (
         <div
           className="payments-evidence-lightbox"
@@ -2173,18 +2437,32 @@ function PaymentReceiptSummary({
   confirmingPaymentId = "",
   onConfirm,
   onReportIssue,
+  onResolveIssue,
+  onCreateReplacementPayment,
 }) {
   const receiptStatus = getProviderReceiptStatus(payment);
   const receiptConfirmed = receiptStatus === "confirmed";
   const receiptIssueReported = receiptStatus === "issue_reported";
+  const receiptResolution = getProviderReceiptResolution(payment);
+  const receiptIssueResolved = receiptResolution.status === "resolved";
   const canConfirmReceipt =
     mode === "provider" && payment?.status === "paid" && !receiptConfirmed;
   const canReportIssue =
     mode === "provider" && payment?.status === "paid" && receiptStatus === "pending";
+  const canResolveIssue =
+    mode === "admin" && receiptIssueReported && !receiptIssueResolved;
+  const canCreateReplacementPayment =
+    mode === "admin" &&
+    receiptIssueResolved &&
+    receiptResolution.outcome === "replacement_payment_required";
   const issueReasonLabel = formatProviderReceiptIssueReason(
     payment?.providerReceipt?.issueReason
   );
-  const hasProviderActions = canConfirmReceipt || canReportIssue;
+  const hasActions =
+    canConfirmReceipt ||
+    canReportIssue ||
+    canResolveIssue ||
+    canCreateReplacementPayment;
 
   return (
     <div
@@ -2223,6 +2501,29 @@ function PaymentReceiptSummary({
               {formatPaymentDate(payment.providerReceipt.issueReportedAt)}
             </span>
           ) : null}
+          {receiptIssueResolved ? (
+            <>
+              <span className="payment-receipt-resolution-badge">
+                Resolved
+              </span>
+              <span className="payment-receipt-summary-detail">
+                Outcome:{" "}
+                {formatProviderReceiptResolutionOutcome(
+                  receiptResolution.outcome
+                )}
+              </span>
+              {receiptResolution.note ? (
+                <span className="payment-receipt-summary-detail">
+                  Admin note: {receiptResolution.note}
+                </span>
+              ) : null}
+              {receiptResolution.resolvedAt ? (
+                <span className="payment-receipt-summary-date">
+                  Resolved on {formatPaymentDate(receiptResolution.resolvedAt)}
+                </span>
+              ) : null}
+            </>
+          ) : null}
         </div>
       ) : null}
 
@@ -2232,7 +2533,7 @@ function PaymentReceiptSummary({
         </span>
       ) : null}
 
-      {hasProviderActions ? (
+      {hasActions ? (
         <div className="payment-receipt-summary-actions">
           {canConfirmReceipt ? (
             <button
@@ -2254,6 +2555,26 @@ function PaymentReceiptSummary({
               onClick={() => onReportIssue?.(payment)}
             >
               Report Payment Issue
+            </button>
+          ) : null}
+
+          {canResolveIssue ? (
+            <button
+              type="button"
+              className="payment-receipt-resolve-button"
+              onClick={() => onResolveIssue?.(payment)}
+            >
+              Resolve Issue
+            </button>
+          ) : null}
+
+          {canCreateReplacementPayment ? (
+            <button
+              type="button"
+              className="payment-receipt-replacement-button"
+              onClick={() => onCreateReplacementPayment?.(payment)}
+            >
+              Create Replacement Payment
             </button>
           ) : null}
         </div>

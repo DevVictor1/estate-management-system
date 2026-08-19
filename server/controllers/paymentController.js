@@ -62,6 +62,15 @@ const PROVIDER_RECEIPT_ISSUE_REASONS = [
   "incorrect_amount",
   "other",
 ];
+const PROVIDER_RECEIPT_RESOLUTION_STATUSES = ["unresolved", "resolved"];
+const PROVIDER_RECEIPT_RESOLUTION_OUTCOMES = [
+  "payment_received",
+  "bank_delay_resolved",
+  "transfer_failed_or_reversed",
+  "replacement_payment_required",
+  "amount_issue_resolved",
+  "other",
+];
 
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
@@ -125,11 +134,47 @@ const sanitizeProviderReceiptIssueNote = (value) => {
   return safeValue;
 };
 
+const normalizeProviderReceiptResolutionStatus = (value = "") => {
+  const safeValue = String(value || "").trim().toLowerCase();
+
+  return PROVIDER_RECEIPT_RESOLUTION_STATUSES.includes(safeValue)
+    ? safeValue
+    : "unresolved";
+};
+
+const normalizeProviderReceiptResolutionOutcome = (value = "") => {
+  const safeValue = String(value || "").trim().toLowerCase();
+
+  return PROVIDER_RECEIPT_RESOLUTION_OUTCOMES.includes(safeValue)
+    ? safeValue
+    : "";
+};
+
+const sanitizeProviderReceiptResolutionNote = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+
+  const safeValue = String(value).trim();
+
+  if (safeValue.length > 1000) {
+    throw buildValidationError(
+      "Payment resolution note must be 1000 characters or fewer."
+    );
+  }
+
+  return safeValue;
+};
+
 const serializeProviderReceipt = (providerReceipt) => {
   const source = providerReceipt?.toObject
     ? providerReceipt.toObject()
     : providerReceipt || {};
   const status = normalizeProviderReceiptStatus(source.status);
+  const resolutionSource = source.resolution || {};
+  const resolutionStatus = normalizeProviderReceiptResolutionStatus(
+    resolutionSource.status
+  );
 
   return {
     status,
@@ -142,6 +187,23 @@ const serializeProviderReceipt = (providerReceipt) => {
     issueNote: source.issueNote || "",
     issueReportedAt: source.issueReportedAt || null,
     issueReportedBy: source.issueReportedBy || null,
+    resolution: {
+      status: resolutionStatus,
+      outcome:
+        resolutionSource.outcome &&
+        PROVIDER_RECEIPT_RESOLUTION_OUTCOMES.includes(resolutionSource.outcome)
+          ? resolutionSource.outcome
+          : "",
+      note: resolutionSource.note || "",
+      resolvedAt:
+        resolutionStatus === "resolved"
+          ? resolutionSource.resolvedAt || null
+          : null,
+      resolvedBy:
+        resolutionStatus === "resolved"
+          ? resolutionSource.resolvedBy || null
+          : null,
+    },
   };
 };
 
@@ -761,6 +823,9 @@ const reportProviderReceiptIssue = async (req, res) => {
       issueNote,
       issueReportedAt: new Date(),
       issueReportedBy: req.user?._id,
+      resolution: {
+        status: "unresolved",
+      },
     };
 
     await payment.save();
@@ -802,6 +867,88 @@ const reportProviderReceiptIssue = async (req, res) => {
       message:
         statusCode >= 500
           ? "Failed to report payment receipt issue"
+          : error.message,
+    });
+  }
+};
+
+const resolveProviderReceiptIssue = async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    if (normalizeProviderReceiptStatus(payment.providerReceipt?.status) !== "issue_reported") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only payments with a reported provider receipt issue can be resolved.",
+      });
+    }
+
+    const resolutionOutcome = normalizeProviderReceiptResolutionOutcome(
+      req.body?.outcome
+    );
+    const resolutionNote = sanitizeProviderReceiptResolutionNote(req.body?.note);
+
+    if (!resolutionOutcome) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please select a valid receipt issue resolution outcome.",
+      });
+    }
+
+    const existingProviderReceipt = payment.providerReceipt?.toObject
+      ? payment.providerReceipt.toObject()
+      : payment.providerReceipt || {};
+
+    payment.providerReceipt = {
+      ...existingProviderReceipt,
+      resolution: {
+        status: "resolved",
+        outcome: resolutionOutcome,
+        note: resolutionNote,
+        resolvedAt: new Date(),
+        resolvedBy: req.user?._id,
+      },
+    };
+
+    await payment.save();
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment issue resolved successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError"
+        ? 400
+        : 500);
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to resolve payment receipt issue"
           : error.message,
     });
   }
@@ -1288,6 +1435,7 @@ module.exports = {
   updatePaymentStatus,
   confirmProviderReceipt,
   reportProviderReceiptIssue,
+  resolveProviderReceiptIssue,
   uploadPaymentEvidence,
   deletePaymentEvidence,
   deletePayment,

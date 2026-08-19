@@ -10,6 +10,7 @@ const {
   updatePaymentStatus,
   confirmProviderReceipt,
   reportProviderReceiptIssue,
+  resolveProviderReceiptIssue,
   uploadPaymentEvidence,
   deletePaymentEvidence,
   deletePayment,
@@ -45,6 +46,12 @@ router.patch(
   protect,
   authorizeRoles("service_provider"),
   reportProviderReceiptIssue
+);
+router.patch(
+  "/:id/resolve-receipt-issue",
+  protect,
+  authorizeRoles("admin"),
+  resolveProviderReceiptIssue
 );
 router.put("/:id", protect, authorizeRoles("admin"), updatePayment);
 router.delete("/:id", protect, authorizeRoles("admin"), deletePayment);

@@ -81,6 +81,36 @@ const paymentSchema = new mongoose.Schema(
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
+      resolution: {
+        status: {
+          type: String,
+          enum: ["unresolved", "resolved"],
+          default: "unresolved",
+        },
+        outcome: {
+          type: String,
+          enum: [
+            "payment_received",
+            "bank_delay_resolved",
+            "transfer_failed_or_reversed",
+            "replacement_payment_required",
+            "amount_issue_resolved",
+            "other",
+          ],
+        },
+        note: {
+          type: String,
+          trim: true,
+          maxlength: 1000,
+        },
+        resolvedAt: {
+          type: Date,
+        },
+        resolvedBy: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+      },
     },
 
     paymentEvidence: {
