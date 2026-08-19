@@ -1788,16 +1788,12 @@ function Payments() {
             />
           </div>
 
-          <div style={{ gridColumn: "1 / -1" }}>
+          <div className="payments-form-actions" style={{ gridColumn: "1 / -1" }}>
             <button
               type="submit"
               disabled={submitting}
+              className="payments-form-submit-button"
               style={{
-                padding: "12px 18px",
-                border: "none",
-                borderRadius: "10px",
-                background: "#0b1f3a",
-                color: "#ffffff",
                 cursor: submitting ? "not-allowed" : "pointer",
                 opacity: submitting ? 0.7 : 1,
               }}
@@ -1815,15 +1811,7 @@ function Payments() {
               <button
                 type="button"
                 onClick={resetForm}
-                style={{
-                  marginLeft: "12px",
-                  padding: "12px 18px",
-                  border: "1px solid #d9e2ec",
-                  borderRadius: "10px",
-                  background: "#ffffff",
-                  color: "#14213d",
-                  cursor: "pointer",
-                }}
+                className="payments-form-cancel-button"
               >
                 Cancel Edit
               </button>
@@ -2370,16 +2358,20 @@ const cellStyle = {
 
 const paymentActionsCellStyle = {
   ...cellStyle,
-  minWidth: "460px",
-  whiteSpace: "nowrap",
+  minWidth: "420px",
+  whiteSpace: "normal",
 };
 
 const actionButtonStyle = {
-  padding: "8px 12px",
+  minHeight: "34px",
+  padding: "7px 11px",
   border: "1px solid #d9e2ec",
-  borderRadius: "8px",
+  borderRadius: "9px",
   background: "#ffffff",
   color: "#14213d",
+  fontSize: "0.92rem",
+  fontWeight: "600",
+  lineHeight: "1.2",
   cursor: "pointer",
 };
 
