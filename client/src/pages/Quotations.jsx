@@ -622,6 +622,13 @@ function Quotations() {
     return <p>Loading quotations...</p>;
   }
 
+  const quotationEmptyMessage =
+    quotations.length === 0
+      ? isAdmin
+        ? "No quotations have been submitted yet."
+        : "No quotations have been submitted from your provider account yet."
+      : "No quotations match your current filters.";
+
   return (
     <section className="quotations-page">
       <div className="quotations-header">
@@ -957,7 +964,11 @@ function Quotations() {
           </span>
         </div>
 
-        <div className="quotation-table-wrapper">
+        <div
+          className={`quotation-table-wrapper${
+            isAdmin ? " quotation-admin-table-wrapper" : ""
+          }`}
+        >
           <table className="quotation-table">
             <thead>
               <tr>
@@ -1035,17 +1046,92 @@ function Quotations() {
               ) : (
                 <tr>
                   <td colSpan={isAdmin ? 8 : 7} className="quotation-empty-cell">
-                    {quotations.length === 0
-                      ? isAdmin
-                        ? "No quotations have been submitted yet."
-                        : "No quotations have been submitted from your provider account yet."
-                      : "No quotations match your current filters."}
+                    {quotationEmptyMessage}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {isAdmin ? (
+          <div className="quotation-mobile-list">
+            {filteredQuotations.length > 0 ? (
+              filteredQuotations.map((quotation) => (
+                <article key={quotation._id} className="quotation-mobile-card">
+                  <div className="quotation-mobile-card-top">
+                    <div className="quotation-mobile-card-heading">
+                      <p className="quotation-mobile-card-kicker">Task</p>
+                      <h3>{quotation.task?.title || "Untitled task"}</h3>
+                    </div>
+                    <span
+                      className={`quotation-status-badge quotation-status-${getStatusTone(
+                        quotation.status
+                      )}`}
+                    >
+                      {formatStatusLabel(quotation.status)}
+                    </span>
+                  </div>
+
+                  <p className="quotation-mobile-card-description">
+                    {quotation.task?.description || "No task description"}
+                  </p>
+
+                  <div className="quotation-mobile-card-grid">
+                    <div className="quotation-mobile-card-field quotation-mobile-card-field-wide">
+                      <span className="quotation-mobile-card-label">Provider</span>
+                      <strong>
+                        {quotation.serviceProvider?.companyName || "Not provided"}
+                      </strong>
+                      <small>
+                        {quotation.serviceProvider?.contactPerson || "No contact"}
+                      </small>
+                    </div>
+
+                    <div className="quotation-mobile-card-field">
+                      <span className="quotation-mobile-card-label">Total</span>
+                      <strong>{formatCurrency(quotation.totalAmount)}</strong>
+                    </div>
+
+                    <div className="quotation-mobile-card-field">
+                      <span className="quotation-mobile-card-label">Duration</span>
+                      <strong>
+                        {formatDurationLabel(
+                          quotation.estimatedDurationValue,
+                          quotation.estimatedDurationUnit
+                        )}
+                      </strong>
+                    </div>
+
+                    <div className="quotation-mobile-card-field">
+                      <span className="quotation-mobile-card-label">Revision</span>
+                      <strong>Revision {quotation.revisionNumber || 1}</strong>
+                    </div>
+
+                    <div className="quotation-mobile-card-field quotation-mobile-card-field-wide">
+                      <span className="quotation-mobile-card-label">Submitted</span>
+                      <strong>{formatDate(quotation.createdAt, true)}</strong>
+                    </div>
+                  </div>
+
+                  <div className="quotation-action-row quotation-mobile-card-actions">
+                    <button
+                      type="button"
+                      className="quotation-secondary-button"
+                      onClick={() => handleOpenDetails(quotation._id)}
+                    >
+                      Review
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="quotation-mobile-empty" role="status">
+                {quotationEmptyMessage}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="quotation-detail-card">

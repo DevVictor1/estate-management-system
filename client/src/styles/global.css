@@ -2378,6 +2378,10 @@ button:hover {
   border-radius: 16px;
 }
 
+.quotation-mobile-list {
+  display: none;
+}
+
 .quotation-table {
   width: 100%;
   border-collapse: collapse;
@@ -2423,6 +2427,96 @@ button:hover {
   gap: 10px;
   flex-wrap: nowrap;
   white-space: nowrap;
+}
+
+.quotation-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.quotation-mobile-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quotation-mobile-card-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quotation-mobile-card-kicker,
+.quotation-mobile-card-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b !important;
+}
+
+.quotation-mobile-card-heading h3,
+.quotation-mobile-card-description,
+.quotation-mobile-card-field strong,
+.quotation-mobile-card-field small {
+  overflow-wrap: anywhere;
+}
+
+.quotation-mobile-card-heading h3 {
+  font-size: 1rem;
+  font-weight: 720;
+  color: #14213d;
+}
+
+.quotation-mobile-card-description {
+  color: #475569;
+  line-height: 1.55;
+}
+
+.quotation-mobile-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.quotation-mobile-card-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quotation-mobile-card-field strong {
+  color: #14213d;
+}
+
+.quotation-mobile-card-field small {
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.quotation-mobile-card-field-wide {
+  grid-column: 1 / -1;
+}
+
+.quotation-mobile-card-actions {
+  padding-top: 2px;
+}
+
+.quotation-mobile-empty {
+  padding: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  color: #64748b;
+  background: rgba(248, 250, 252, 0.72);
 }
 
 .quotation-empty-cell {
@@ -5755,6 +5849,41 @@ button:hover {
   .quotation-review-actions {
     flex-wrap: wrap;
     white-space: normal;
+  }
+
+  .quotation-toolbar-actions {
+    gap: 12px;
+  }
+
+  .quotation-toolbar-actions .clear-filters-button,
+  .quotation-toolbar-actions .filter-results-count {
+    width: 100%;
+  }
+
+  .quotation-toolbar-actions .filter-results-count {
+    text-align: left;
+  }
+
+  .quotation-admin-table-wrapper {
+    display: none;
+  }
+
+  .quotation-mobile-list {
+    display: grid;
+    gap: 14px;
+  }
+
+  .quotation-mobile-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quotation-mobile-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quotation-mobile-card-actions > * {
+    width: 100%;
   }
 
   .quotations-toast {
