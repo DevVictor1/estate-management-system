@@ -1713,6 +1713,36 @@ button:hover {
   margin-top: auto;
 }
 
+.service-providers-page.resident-provider-directory .resident-provider-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.service-providers-page.resident-provider-directory .resident-provider-card-header {
+  align-items: flex-start;
+}
+
+.service-providers-page.resident-provider-directory .resident-provider-card-identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.service-providers-page.resident-provider-directory .resident-provider-card-identity > div {
+  min-width: 0;
+}
+
+.service-providers-page.resident-provider-directory .resident-provider-card h3,
+.service-providers-page.resident-provider-directory .resident-provider-service,
+.service-providers-page.resident-provider-directory .resident-provider-detail strong {
+  overflow-wrap: anywhere;
+}
+
+.service-providers-page.resident-provider-directory .resident-provider-approved-badge {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
 .resident-provider-empty {
   display: flex;
   flex-direction: column;
@@ -5029,6 +5059,14 @@ button:hover {
 }
 
 @media (max-width: 1180px) {
+  .service-providers-page.resident-provider-directory .resident-provider-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-providers-page.resident-provider-directory .resident-provider-contact-grid {
+    grid-template-columns: 1fr;
+  }
+
   .landing-role-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5599,6 +5637,10 @@ button:hover {
   }
 
   .resident-provider-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .service-providers-page.resident-provider-directory .resident-provider-grid {
     grid-template-columns: 1fr;
   }
 
