@@ -46,6 +46,43 @@ const paymentSchema = new mongoose.Schema(
       type: Date,
     },
 
+    providerReceipt: {
+      status: {
+        type: String,
+        enum: ["pending", "confirmed", "issue_reported"],
+        default: "pending",
+      },
+      confirmedAt: {
+        type: Date,
+      },
+      confirmedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+      issueReason: {
+        type: String,
+        enum: [
+          "not_received",
+          "bank_delay",
+          "transaction_reversed",
+          "incorrect_amount",
+          "other",
+        ],
+      },
+      issueNote: {
+        type: String,
+        trim: true,
+        maxlength: 1000,
+      },
+      issueReportedAt: {
+        type: Date,
+      },
+      issueReportedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    },
+
     paymentEvidence: {
       url: {
         type: String,

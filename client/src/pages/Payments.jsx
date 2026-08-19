@@ -68,6 +68,61 @@ const formatPaymentType = (paymentType) => {
   return safeType.charAt(0).toUpperCase() + safeType.slice(1);
 };
 
+const providerReceiptIssueReasonLabels = {
+  not_received: "Payment not received",
+  bank_delay: "Bank processing delay",
+  transaction_reversed: "Transaction reversed",
+  incorrect_amount: "Incorrect amount",
+  other: "Other",
+};
+
+const getProviderReceiptStatus = (payment) => {
+  const status = String(payment?.providerReceipt?.status || "")
+    .trim()
+    .toLowerCase();
+
+  return ["confirmed", "issue_reported"].includes(status) ? status : "pending";
+};
+
+const isProviderReceiptConfirmed = (payment) =>
+  getProviderReceiptStatus(payment) === "confirmed";
+
+const isProviderReceiptIssueReported = (payment) =>
+  getProviderReceiptStatus(payment) === "issue_reported";
+
+const formatProviderReceiptIssueReason = (reason) =>
+  providerReceiptIssueReasonLabels[
+    String(reason || "").trim().toLowerCase()
+  ] || "Payment issue reported";
+
+const getAdminReceiptConfirmationLabel = (payment) => {
+  if (payment?.status !== "paid") {
+    return "Unavailable until paid";
+  }
+
+  if (isProviderReceiptIssueReported(payment)) {
+    return "Issue reported";
+  }
+
+  return isProviderReceiptConfirmed(payment)
+    ? "Confirmed by provider"
+    : "Awaiting provider confirmation";
+};
+
+const getProviderReceiptPrompt = (payment) => {
+  if (payment?.status !== "paid") {
+    return "Receipt confirmation becomes available after the payment is marked as paid.";
+  }
+
+  if (isProviderReceiptIssueReported(payment)) {
+    return "Payment issue reported. You can confirm receipt later once the funds arrive.";
+  }
+
+  return isProviderReceiptConfirmed(payment)
+    ? "Payment received confirmed"
+    : "Payment marked as paid. Please confirm once you have received the funds.";
+};
+
 function Payments() {
   const { user } = useAuth();
   const [payments, setPayments] = useState([]);
@@ -87,6 +142,12 @@ function Payments() {
     paymentId: "",
     status: "",
   });
+  const [receiptConfirmingPaymentId, setReceiptConfirmingPaymentId] = useState("");
+  const [receiptIssuePaymentId, setReceiptIssuePaymentId] = useState("");
+  const [receiptIssueReason, setReceiptIssueReason] = useState("not_received");
+  const [receiptIssueNote, setReceiptIssueNote] = useState("");
+  const [receiptIssueError, setReceiptIssueError] = useState("");
+  const [receiptIssueSubmitting, setReceiptIssueSubmitting] = useState(false);
   const [pageError, setPageError] = useState("");
   const [formError, setFormError] = useState("");
   const [warning, setWarning] = useState("");
@@ -145,6 +206,14 @@ function Payments() {
     setEvidenceModalPaymentId("");
     setSelectedEvidenceFile(null);
     setEvidenceError("");
+  };
+
+  const closeReceiptIssueModal = () => {
+    setReceiptIssuePaymentId("");
+    setReceiptIssueReason("not_received");
+    setReceiptIssueNote("");
+    setReceiptIssueError("");
+    setReceiptIssueSubmitting(false);
   };
 
   useEffect(() => {
@@ -252,6 +321,11 @@ function Payments() {
   );
 
   const selectedContractSummary = selectedContract?.financialSummary;
+  const selectedReceiptIssuePayment = useMemo(
+    () =>
+      payments.find((payment) => payment._id === receiptIssuePaymentId) || null,
+    [payments, receiptIssuePaymentId]
+  );
 
   const handleEdit = (payment) => {
     setPageError("");
@@ -470,6 +544,81 @@ function Payments() {
     }
   };
 
+  const handleConfirmReceipt = async (payment) => {
+    if (!payment?._id || payment.status !== "paid") {
+      return;
+    }
+
+    setReceiptConfirmingPaymentId(payment._id);
+    setPageError("");
+    setFormError("");
+    setWarning("");
+    setFeedback("");
+    dismissToast();
+
+    try {
+      await api.patch(`/api/payments/${payment._id}/confirm-receipt`);
+      await fetchPageData();
+      setFeedback("Payment receipt confirmed successfully.");
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to confirm payment receipt."
+      );
+      setPageError(message);
+      showToast("Payment receipt could not be confirmed", message);
+    } finally {
+      setReceiptConfirmingPaymentId("");
+    }
+  };
+
+  const openReceiptIssueModal = (payment) => {
+    if (!payment?._id || payment.status !== "paid") {
+      return;
+    }
+
+    setReceiptIssuePaymentId(payment._id);
+    setReceiptIssueReason("not_received");
+    setReceiptIssueNote("");
+    setReceiptIssueError("");
+    dismissToast();
+  };
+
+  const handleReceiptIssueSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!receiptIssuePaymentId) {
+      return;
+    }
+
+    setReceiptIssueSubmitting(true);
+    setReceiptIssueError("");
+    setPageError("");
+    setFormError("");
+    setWarning("");
+    setFeedback("");
+    dismissToast();
+
+    try {
+      await api.patch(`/api/payments/${receiptIssuePaymentId}/report-receipt-issue`, {
+        issueReason: receiptIssueReason,
+        issueNote: receiptIssueNote,
+      });
+      await fetchPageData();
+      closeReceiptIssueModal();
+      setFeedback("Payment issue reported successfully.");
+    } catch (err) {
+      const message = extractErrorMessage(
+        err,
+        "Failed to report the payment issue."
+      );
+      setReceiptIssueError(message);
+      showToast("Payment issue could not be reported", message);
+    } finally {
+      setReceiptIssueSubmitting(false);
+    }
+  };
+
   const openEvidenceModal = (payment) => {
     setEvidenceModalPaymentId(payment._id);
     setSelectedEvidenceFile(null);
@@ -677,6 +826,11 @@ function Payments() {
         </div>
 
         {pageError ? <p style={{ color: "#c1121f" }}>{pageError}</p> : null}
+        {feedback ? (
+          <p className="payments-feedback payments-feedback-success" role="status">
+            {feedback}
+          </p>
+        ) : null}
 
         {!providerPayments.length ? (
           <section className="dashboard-section-card provider-payment-empty">
@@ -744,6 +898,7 @@ function Payments() {
                       <th>Payment Method</th>
                       <th>Status</th>
                       <th>Reference Number</th>
+                      <th>Receipt Confirmation</th>
                       <th>Payment Evidence</th>
                     </tr>
                   </thead>
@@ -765,6 +920,15 @@ function Payments() {
                           </span>
                         </td>
                         <td>{payment.referenceNumber || "-"}</td>
+                        <td>
+                          <PaymentReceiptSummary
+                            payment={payment}
+                            mode="provider"
+                            confirmingPaymentId={receiptConfirmingPaymentId}
+                            onConfirm={handleConfirmReceipt}
+                            onReportIssue={openReceiptIssueModal}
+                          />
+                        </td>
                         <td>
                           {renderProviderEvidenceCell(payment, {
                             onPreviewImage: setEvidencePreview,
@@ -822,6 +986,18 @@ function Payments() {
                           Reference Number
                         </span>
                         <strong>{payment.referenceNumber || "-"}</strong>
+                      </div>
+                      <div className="provider-payments-card-field provider-payments-card-field-wide">
+                        <span className="provider-payments-card-label">
+                          Receipt Confirmation
+                        </span>
+                        <PaymentReceiptSummary
+                          payment={payment}
+                          mode="provider"
+                          confirmingPaymentId={receiptConfirmingPaymentId}
+                          onConfirm={handleConfirmReceipt}
+                          onReportIssue={openReceiptIssueModal}
+                        />
                       </div>
                       <div className="provider-payments-card-field">
                         <span className="provider-payments-card-label">
@@ -1416,6 +1592,7 @@ function Payments() {
                 "Payment Type",
                 "Payment Method",
                 "Status",
+                "Provider Confirmation",
                 "Reference Number",
                 "Notes",
                 "Evidence",
@@ -1461,6 +1638,9 @@ function Payments() {
                     >
                       {payment.status}
                     </span>
+                  </td>
+                  <td style={cellStyle}>
+                    <PaymentReceiptSummary payment={payment} mode="admin" />
                   </td>
                   <td style={cellStyle}>{payment.referenceNumber || "-"}</td>
                   <td style={cellStyle}>{payment.notes || "-"}</td>
@@ -1562,7 +1742,7 @@ function Payments() {
             ) : (
               <tr>
                 <td
-                  colSpan={isAdmin ? "11" : "9"}
+                  colSpan={isAdmin ? "11" : "10"}
                   style={{
                     padding: "18px",
                     textAlign: "center",
@@ -1736,6 +1916,117 @@ function Payments() {
         </div>
       ) : null}
 
+      {isServiceProvider && selectedReceiptIssuePayment ? (
+        <div
+          className="payments-receipt-issue-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Report payment issue"
+          onClick={closeReceiptIssueModal}
+        >
+          <div
+            className="payments-receipt-issue-dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="payments-receipt-issue-header">
+              <div>
+                <p className="payments-evidence-eyebrow">Payment Receipt</p>
+                <h2>Report Payment Issue</h2>
+                <p>
+                  {selectedReceiptIssuePayment.contract?.contractTitle ||
+                    "Contract Payment"}{" "}
+                  •{" "}
+                  {currencyFormatter.format(
+                    Number(selectedReceiptIssuePayment.amount) || 0
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="payments-evidence-close"
+                onClick={closeReceiptIssueModal}
+              >
+                Close
+              </button>
+            </div>
+
+            <form
+              className="payments-receipt-issue-form"
+              onSubmit={handleReceiptIssueSubmit}
+            >
+              <div className="payments-receipt-issue-panel">
+                <label
+                  className="payments-evidence-label"
+                  htmlFor="paymentIssueReason"
+                >
+                  Issue Reason
+                </label>
+                <select
+                  id="paymentIssueReason"
+                  value={receiptIssueReason}
+                  onChange={(event) => setReceiptIssueReason(event.target.value)}
+                  className="payments-receipt-issue-input"
+                  disabled={receiptIssueSubmitting}
+                >
+                  {Object.entries(providerReceiptIssueReasonLabels).map(
+                    ([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </div>
+
+              <div className="payments-receipt-issue-panel">
+                <label
+                  className="payments-evidence-label"
+                  htmlFor="paymentIssueNote"
+                >
+                  Short Note <span className="payments-receipt-issue-optional">(Optional)</span>
+                </label>
+                <textarea
+                  id="paymentIssueNote"
+                  value={receiptIssueNote}
+                  onChange={(event) => setReceiptIssueNote(event.target.value)}
+                  className="payments-receipt-issue-textarea"
+                  rows={4}
+                  maxLength={1000}
+                  disabled={receiptIssueSubmitting}
+                  placeholder="Add any brief context about the payment issue."
+                />
+              </div>
+
+              {receiptIssueError ? (
+                <div className="payments-form-alert payments-receipt-issue-alert" role="alert">
+                  {receiptIssueError}
+                </div>
+              ) : null}
+
+              <div className="payments-receipt-issue-actions">
+                <button
+                  type="submit"
+                  className="payments-evidence-primary"
+                  disabled={receiptIssueSubmitting}
+                >
+                  {receiptIssueSubmitting
+                    ? "Reporting..."
+                    : "Report Payment Issue"}
+                </button>
+                <button
+                  type="button"
+                  className="payments-evidence-secondary"
+                  onClick={closeReceiptIssueModal}
+                  disabled={receiptIssueSubmitting}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {evidencePreview ? (
         <div
           className="payments-evidence-lightbox"
@@ -1867,6 +2158,96 @@ const statusBadgeStyles = {
 };
 
 export default Payments;
+
+function PaymentReceiptSummary({
+  payment,
+  mode = "provider",
+  confirmingPaymentId = "",
+  onConfirm,
+  onReportIssue,
+}) {
+  const receiptStatus = getProviderReceiptStatus(payment);
+  const receiptConfirmed = receiptStatus === "confirmed";
+  const receiptIssueReported = receiptStatus === "issue_reported";
+  const canConfirmReceipt =
+    mode === "provider" && payment?.status === "paid" && !receiptConfirmed;
+  const canReportIssue =
+    mode === "provider" && payment?.status === "paid" && receiptStatus === "pending";
+  const issueReasonLabel = formatProviderReceiptIssueReason(
+    payment?.providerReceipt?.issueReason
+  );
+
+  return (
+    <div
+      className={`payment-receipt-summary${
+        mode === "admin" ? " payment-receipt-summary-admin" : ""
+      }`}
+    >
+      <span
+        className={`payment-receipt-summary-badge payment-receipt-summary-badge-${receiptStatus}`}
+      >
+        {receiptConfirmed
+          ? "Confirmed"
+          : receiptIssueReported
+          ? "Issue Reported"
+          : "Pending"}
+      </span>
+      <p className="payment-receipt-summary-text">
+        {mode === "admin"
+          ? getAdminReceiptConfirmationLabel(payment)
+          : getProviderReceiptPrompt(payment)}
+      </p>
+
+      {receiptIssueReported ? (
+        <div className="payment-receipt-summary-meta">
+          <span className="payment-receipt-summary-detail">
+            Reason: {issueReasonLabel}
+          </span>
+          {payment?.providerReceipt?.issueNote ? (
+            <span className="payment-receipt-summary-detail">
+              Note: {payment.providerReceipt.issueNote}
+            </span>
+          ) : null}
+          {payment?.providerReceipt?.issueReportedAt ? (
+            <span className="payment-receipt-summary-date">
+              Reported on{" "}
+              {formatPaymentDate(payment.providerReceipt.issueReportedAt)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
+      {receiptConfirmed && payment?.providerReceipt?.confirmedAt ? (
+        <span className="payment-receipt-summary-date">
+          Confirmed on {formatPaymentDate(payment.providerReceipt.confirmedAt)}
+        </span>
+      ) : null}
+
+      {canConfirmReceipt ? (
+        <button
+          type="button"
+          className="payment-receipt-confirm-button"
+          onClick={() => onConfirm?.(payment)}
+          disabled={confirmingPaymentId === payment?._id}
+        >
+          {confirmingPaymentId === payment?._id
+            ? "Confirming..."
+            : "Confirm Payment Received"}
+        </button>
+      ) : null}
+
+      {canReportIssue ? (
+        <button
+          type="button"
+          className="payment-receipt-issue-button"
+          onClick={() => onReportIssue?.(payment)}
+        >
+          Report Payment Issue
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function isImageEvidence(paymentEvidence) {
   return Boolean(paymentEvidence?.mimeType?.startsWith("image/"));

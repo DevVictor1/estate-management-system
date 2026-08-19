@@ -8,6 +8,8 @@ const {
   getPaymentById,
   updatePayment,
   updatePaymentStatus,
+  confirmProviderReceipt,
+  reportProviderReceiptIssue,
   uploadPaymentEvidence,
   deletePaymentEvidence,
   deletePayment,
@@ -32,6 +34,18 @@ router.delete(
 );
 router.get("/:id", protect, getPaymentById);
 router.patch("/:id/status", protect, authorizeRoles("admin"), updatePaymentStatus);
+router.patch(
+  "/:id/confirm-receipt",
+  protect,
+  authorizeRoles("service_provider"),
+  confirmProviderReceipt
+);
+router.patch(
+  "/:id/report-receipt-issue",
+  protect,
+  authorizeRoles("service_provider"),
+  reportProviderReceiptIssue
+);
 router.put("/:id", protect, authorizeRoles("admin"), updatePayment);
 router.delete("/:id", protect, authorizeRoles("admin"), deletePayment);
 

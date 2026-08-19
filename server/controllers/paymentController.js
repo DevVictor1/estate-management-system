@@ -3,11 +3,15 @@ const mongoose = require("mongoose");
 const Payment = require("../models/Payment");
 const Contract = require("../models/Contract");
 const ServiceProvider = require("../models/ServiceProvider");
+const User = require("../models/User");
 const { getEmailConfig } = require("../config/email");
 const { sendEmail } = require("../services/emailService");
 const {
   buildPaymentRecordedEmail,
 } = require("../emailTemplates/paymentRecorded");
+const {
+  buildPaymentIssueReportedEmail,
+} = require("../emailTemplates/paymentIssueReported");
 const {
   resolveVerifiedUserEmailRecipient,
 } = require("../utils/verifiedRecipients");
@@ -46,6 +50,19 @@ const ADMIN_PAYMENT_STATUS_TRANSITIONS = {
   pending: ["paid", "cancelled"],
 };
 
+const PROVIDER_RECEIPT_STATUSES = [
+  "pending",
+  "confirmed",
+  "issue_reported",
+];
+const PROVIDER_RECEIPT_ISSUE_REASONS = [
+  "not_received",
+  "bank_delay",
+  "transaction_reversed",
+  "incorrect_amount",
+  "other",
+];
+
 const isValidEmail = (value = "") =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
@@ -76,6 +93,58 @@ const serializePaymentEvidence = (paymentEvidence) => {
   };
 };
 
+const normalizeProviderReceiptStatus = (value = "") => {
+  const safeValue = String(value || "").trim().toLowerCase();
+
+  return PROVIDER_RECEIPT_STATUSES.includes(safeValue)
+    ? safeValue
+    : "pending";
+};
+
+const normalizeProviderReceiptIssueReason = (value = "") => {
+  const safeValue = String(value || "").trim().toLowerCase();
+
+  return PROVIDER_RECEIPT_ISSUE_REASONS.includes(safeValue)
+    ? safeValue
+    : "";
+};
+
+const sanitizeProviderReceiptIssueNote = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+
+  const safeValue = String(value).trim();
+
+  if (safeValue.length > 1000) {
+    throw buildValidationError(
+      "Payment issue note must be 1000 characters or fewer."
+    );
+  }
+
+  return safeValue;
+};
+
+const serializeProviderReceipt = (providerReceipt) => {
+  const source = providerReceipt?.toObject
+    ? providerReceipt.toObject()
+    : providerReceipt || {};
+  const status = normalizeProviderReceiptStatus(source.status);
+
+  return {
+    status,
+    confirmedAt: status === "confirmed" ? source.confirmedAt || null : null,
+    confirmedBy: status === "confirmed" ? source.confirmedBy || null : null,
+    issueReason:
+      source.issueReason && PROVIDER_RECEIPT_ISSUE_REASONS.includes(source.issueReason)
+        ? source.issueReason
+        : "",
+    issueNote: source.issueNote || "",
+    issueReportedAt: source.issueReportedAt || null,
+    issueReportedBy: source.issueReportedBy || null,
+  };
+};
+
 const serializePaymentRecord = (payment) => {
   if (!payment) {
     return payment;
@@ -84,6 +153,9 @@ const serializePaymentRecord = (payment) => {
   const paymentObject = payment.toObject ? payment.toObject() : { ...payment };
   paymentObject.paymentEvidence = serializePaymentEvidence(
     paymentObject.paymentEvidence
+  );
+  paymentObject.providerReceipt = serializeProviderReceipt(
+    paymentObject.providerReceipt
   );
   return paymentObject;
 };
@@ -108,6 +180,43 @@ const getPaymentNotificationRecipient = async (provider) => {
   );
   console.info(`recipient source: ${recipientSource}`);
   console.info(`recipient count: ${recipients.length}`);
+
+  return recipients;
+};
+
+const getAdminPaymentIssueRecipients = async () => {
+  const { emailAdminRecipient } = getEmailConfig();
+  const overrideRecipient = String(emailAdminRecipient || "").trim();
+
+  console.info(
+    `payment issue admin override configured: ${overrideRecipient ? "yes" : "no"}`
+  );
+
+  if (overrideRecipient) {
+    const recipients = isValidEmail(overrideRecipient) ? [overrideRecipient] : [];
+    console.info("payment issue recipient source: environment override");
+    console.info(`payment issue recipient count: ${recipients.length}`);
+
+    return recipients;
+  }
+
+  const adminUsers = await User.find({
+    role: "admin",
+    isActive: true,
+    emailVerified: { $ne: false },
+  }).select("email");
+
+  const recipients = [
+    ...new Set(
+      adminUsers
+        .map((admin) => String(admin.email || "").trim())
+        .filter(Boolean)
+        .filter(isValidEmail)
+    ),
+  ];
+
+  console.info("payment issue recipient source: database");
+  console.info(`payment issue recipient count: ${recipients.length}`);
 
   return recipients;
 };
@@ -376,6 +485,45 @@ const sendPaymentNotification = async ({
   }
 };
 
+const sendPaymentIssueReportedNotification = async ({
+  payment,
+  contract,
+  serviceProvider,
+  providerReceipt,
+}) => {
+  const recipients = await getAdminPaymentIssueRecipients();
+
+  if (!recipients.length) {
+    console.warn(
+      "Payment issue reported, but no valid admin notification recipient was available."
+    );
+    return;
+  }
+
+  const emailPayload = buildPaymentIssueReportedEmail({
+    companyName: serviceProvider?.companyName,
+    contractTitle: contract?.contractTitle,
+    amount: payment?.amount,
+    paymentDate: payment?.paymentDate,
+    referenceNumber: payment?.referenceNumber,
+    issueReason: providerReceipt?.issueReason,
+    issueNote: providerReceipt?.issueNote,
+    issueReportedAt: providerReceipt?.issueReportedAt,
+    reviewUrl: getPaymentsReviewUrl(),
+  });
+
+  const emailResult = await sendEmail({
+    to: recipients,
+    subject: emailPayload.subject,
+    html: emailPayload.html,
+    text: emailPayload.text,
+  });
+
+  if (!emailResult.success) {
+    console.warn("Payment issue reported, but admin notification email failed.");
+  }
+};
+
 const validateAdminPaymentStatusTransition = (currentStatus, nextStatus) => {
   const safeCurrentStatus = normalizePaymentStatus(currentStatus);
   const safeNextStatus = normalizePaymentStatus(nextStatus);
@@ -417,6 +565,13 @@ const applyPaymentStatusLifecycle = ({
 
   if (safePreviousStatus !== "paid" && safeNextStatus === "paid") {
     payment.paidAt = paidAt;
+
+    if (!PROVIDER_RECEIPT_STATUSES.includes(payment.providerReceipt?.status)) {
+      payment.providerReceipt = {
+        status: "pending",
+      };
+    }
+
     return { becamePaid: true };
   }
 
@@ -425,6 +580,231 @@ const applyPaymentStatusLifecycle = ({
   }
 
   return { becamePaid: false };
+};
+
+const confirmProviderReceipt = async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const scopeMatch = await getPaymentScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to confirm payment receipt.",
+      });
+    }
+
+    const ownedPayment = await Payment.exists({
+      _id: payment._id,
+      ...scopeMatch,
+    });
+
+    if (!ownedPayment) {
+      return res.status(403).json({
+        success: false,
+        message: "You can confirm receipt only for your own payments.",
+      });
+    }
+
+    if (normalizePaymentStatus(payment.status) !== "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "Only payments already marked as paid can be confirmed.",
+      });
+    }
+
+    if (normalizeProviderReceiptStatus(payment.providerReceipt?.status) === "confirmed") {
+      const populatedPayment = await populatePaymentRecord(payment._id);
+
+      return res.status(200).json({
+        success: true,
+        message: "Payment receipt was already confirmed.",
+        data: populatedPayment,
+      });
+    }
+
+    const existingProviderReceipt = payment.providerReceipt?.toObject
+      ? payment.providerReceipt.toObject()
+      : payment.providerReceipt || {};
+
+    payment.providerReceipt = {
+      ...existingProviderReceipt,
+      status: "confirmed",
+      confirmedAt: new Date(),
+      confirmedBy: req.user?._id,
+    };
+
+    await payment.save();
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment receipt confirmed successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to confirm payment receipt"
+          : error.message,
+    });
+  }
+};
+
+const reportProviderReceiptIssue = async (req, res) => {
+  try {
+    const paymentId = String(req.params.id || "").trim();
+
+    if (!mongoose.Types.ObjectId.isValid(paymentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment ID must be a valid record identifier.",
+      });
+    }
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found",
+      });
+    }
+
+    const scopeMatch = await getPaymentScopeMatch(req.user);
+
+    if (scopeMatch === null) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to report payment receipt issues.",
+      });
+    }
+
+    const ownedPayment = await Payment.exists({
+      _id: payment._id,
+      ...scopeMatch,
+    });
+
+    if (!ownedPayment) {
+      return res.status(403).json({
+        success: false,
+        message: "You can report receipt issues only for your own payments.",
+      });
+    }
+
+    if (normalizePaymentStatus(payment.status) !== "paid") {
+      return res.status(400).json({
+        success: false,
+        message: "Only payments already marked as paid can have receipt issues reported.",
+      });
+    }
+
+    if (normalizeProviderReceiptStatus(payment.providerReceipt?.status) === "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This payment has already been confirmed as received. Receipt issues can only be reported before confirmation.",
+      });
+    }
+
+    const issueReason = normalizeProviderReceiptIssueReason(req.body?.issueReason);
+    const issueNote = sanitizeProviderReceiptIssueNote(req.body?.issueNote);
+
+    if (!issueReason) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please select a valid payment issue reason: not_received, bank_delay, transaction_reversed, incorrect_amount, or other.",
+      });
+    }
+
+    const existingProviderReceipt = payment.providerReceipt?.toObject
+      ? payment.providerReceipt.toObject()
+      : payment.providerReceipt || {};
+    const duplicateIssueReport =
+      normalizeProviderReceiptStatus(existingProviderReceipt.status) ===
+        "issue_reported" &&
+      normalizeProviderReceiptIssueReason(existingProviderReceipt.issueReason) ===
+        issueReason &&
+      String(existingProviderReceipt.issueNote || "") === issueNote;
+
+    payment.providerReceipt = {
+      ...existingProviderReceipt,
+      status: "issue_reported",
+      confirmedAt: undefined,
+      confirmedBy: undefined,
+      issueReason,
+      issueNote,
+      issueReportedAt: new Date(),
+      issueReportedBy: req.user?._id,
+    };
+
+    await payment.save();
+
+    if (!duplicateIssueReport) {
+      try {
+        const { contract, serviceProvider } = await getValidatedPaymentContext({
+          contract: payment.contract,
+          serviceProvider: payment.serviceProvider,
+        });
+
+        await sendPaymentIssueReportedNotification({
+          payment,
+          contract,
+          serviceProvider,
+          providerReceipt: payment.providerReceipt,
+        });
+      } catch (emailError) {
+        console.warn(
+          "Payment issue reported successfully, but the admin notification email failed."
+        );
+      }
+    }
+
+    const populatedPayment = await populatePaymentRecord(payment._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment issue reported successfully.",
+      data: populatedPayment,
+    });
+  } catch (error) {
+    const statusCode =
+      error.statusCode ||
+      (error.name === "ValidationError" || error.name === "CastError" ? 400 : 500);
+
+    return res.status(statusCode).json({
+      success: false,
+      message:
+        statusCode >= 500
+          ? "Failed to report payment receipt issue"
+          : error.message,
+    });
+  }
 };
 
 const createPayment = async (req, res) => {
@@ -906,6 +1286,8 @@ module.exports = {
   getPaymentById,
   updatePayment,
   updatePaymentStatus,
+  confirmProviderReceipt,
+  reportProviderReceiptIssue,
   uploadPaymentEvidence,
   deletePaymentEvidence,
   deletePayment,

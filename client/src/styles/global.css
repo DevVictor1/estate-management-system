@@ -3774,6 +3774,104 @@ button:hover {
   color: var(--success-text);
 }
 
+.payment-receipt-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.payment-receipt-summary-admin {
+  max-width: 220px;
+}
+
+.payment-receipt-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.payment-receipt-summary-badge-pending {
+  background: rgba(254, 243, 199, 0.92);
+  color: #92400e;
+}
+
+.payment-receipt-summary-badge-confirmed {
+  background: rgba(220, 252, 231, 0.95);
+  color: #166534;
+}
+
+.payment-receipt-summary-badge-issue_reported {
+  background: rgba(254, 242, 242, 0.95);
+  color: var(--danger-text);
+}
+
+.payment-receipt-summary-text {
+  color: var(--text-main) !important;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.payment-receipt-summary-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payment-receipt-summary-detail {
+  color: var(--text-main);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.payment-receipt-summary-date {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.payment-receipt-confirm-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(22, 101, 52, 0.18);
+  border-radius: 12px;
+  background: rgba(220, 252, 231, 0.96);
+  color: #166534;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.payment-receipt-issue-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(185, 28, 28, 0.18);
+  border-radius: 12px;
+  background: rgba(254, 242, 242, 0.96);
+  color: var(--danger-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.payment-receipt-confirm-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .payments-action-row {
   display: flex;
   align-items: center;
@@ -3809,7 +3907,8 @@ button:hover {
 }
 
 .payments-evidence-modal,
-.payments-evidence-lightbox {
+.payments-evidence-lightbox,
+.payments-receipt-issue-modal {
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -3821,7 +3920,8 @@ button:hover {
 }
 
 .payments-evidence-dialog,
-.payments-evidence-lightbox-dialog {
+.payments-evidence-lightbox-dialog,
+.payments-receipt-issue-dialog {
   width: min(100%, 720px);
   max-height: 90vh;
   overflow-y: auto;
@@ -3835,12 +3935,17 @@ button:hover {
   padding: 24px;
 }
 
+.payments-receipt-issue-dialog {
+  padding: 24px;
+}
+
 .payments-evidence-lightbox-dialog {
   padding: 20px;
 }
 
 .payments-evidence-header,
-.payments-evidence-lightbox-header {
+.payments-evidence-lightbox-header,
+.payments-receipt-issue-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -3874,11 +3979,48 @@ button:hover {
 
 .payments-evidence-current,
 .payments-evidence-upload,
-.payments-evidence-empty-card {
+.payments-evidence-empty-card,
+.payments-receipt-issue-panel {
   padding: 18px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
   background: rgba(248, 250, 252, 0.86);
+}
+
+.payments-receipt-issue-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.payments-receipt-issue-input,
+.payments-receipt-issue-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: #ffffff;
+  color: var(--text-main);
+}
+
+.payments-receipt-issue-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.payments-receipt-issue-optional {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.payments-receipt-issue-alert {
+  margin-top: -4px;
+}
+
+.payments-receipt-issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .payments-evidence-current {
@@ -4163,6 +4305,10 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.provider-payments-card-field-wide {
+  grid-column: 1 / -1;
 }
 
 .provider-payments-card-label {
@@ -5749,12 +5895,14 @@ button:hover {
   }
 
   .payments-evidence-modal,
-  .payments-evidence-lightbox {
+  .payments-evidence-lightbox,
+  .payments-receipt-issue-modal {
     padding: 16px;
   }
 
   .payments-evidence-dialog,
-  .payments-evidence-lightbox-dialog {
+  .payments-evidence-lightbox-dialog,
+  .payments-receipt-issue-dialog {
     width: 100%;
   }
 
@@ -5771,8 +5919,17 @@ button:hover {
     grid-template-columns: 1fr;
   }
 
+  .payment-receipt-confirm-button {
+    width: 100%;
+  }
+
+  .payment-receipt-issue-button {
+    width: 100%;
+  }
+
   .payments-evidence-header,
-  .payments-evidence-lightbox-header {
+  .payments-evidence-lightbox-header,
+  .payments-receipt-issue-header {
     flex-direction: column;
     align-items: flex-start;
   }
@@ -5793,6 +5950,10 @@ button:hover {
   .payments-provider-details-grid {
     grid-template-columns: 1fr;
     gap: 14px;
+  }
+
+  .payments-receipt-issue-actions > * {
+    width: 100%;
   }
 
   .payments-evidence-thumbnail {
