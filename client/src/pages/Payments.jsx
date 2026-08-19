@@ -1155,7 +1155,8 @@ function Payments() {
                 </div>
               ) : (
                 <div className="payments-provider-details-empty">
-                  This provider has not added payment details yet.
+                  Payment details unavailable. This service provider has not
+                  added their payment information yet.
                 </div>
               )}
             </div>

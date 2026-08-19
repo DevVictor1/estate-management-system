@@ -2643,6 +2643,52 @@ button:hover {
   box-shadow: var(--shadow-soft);
 }
 
+.service-providers-page .provider-payment-reminder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 20px;
+  background: rgba(255, 251, 235, 0.92);
+}
+
+.service-providers-page .provider-payment-reminder-copy {
+  min-width: 0;
+}
+
+.service-providers-page .provider-payment-reminder-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #7c4700;
+}
+
+.service-providers-page .provider-payment-reminder-text {
+  margin-top: 8px;
+  color: #8b5a12;
+  line-height: 1.6;
+}
+
+.service-providers-page .provider-payment-reminder-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #7c4700;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.service-providers-page .provider-payment-reminder + .provider-payment-card {
+  margin-top: 16px;
+}
+
 .service-providers-page .provider-payment-card + .provider-payment-card,
 .service-providers-page .provider-public-grid + .provider-payment-card,
 .service-providers-page .providers-empty-state + .provider-payment-card {
@@ -5607,6 +5653,15 @@ button:hover {
   .service-providers-page .provider-table-wrapper,
   .service-providers-page .provider-payment-card {
     padding: 18px;
+  }
+
+  .service-providers-page .provider-payment-reminder {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .service-providers-page .provider-payment-reminder-action {
+    width: 100%;
   }
 
   .service-providers-page .provider-form {

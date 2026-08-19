@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FaArrowRotateLeft,
   FaBroom,
@@ -68,6 +68,8 @@ function ServiceProviders() {
   const [paymentFeedback, setPaymentFeedback] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [copiedAccountFeedback, setCopiedAccountFeedback] = useState("");
+  const paymentInformationSectionRef = useRef(null);
+  const bankNameInputRef = useRef(null);
   const isAdmin = user?.role === "admin";
   const isResident = user?.role === "resident";
   const isServiceProvider = user?.role === "service_provider";
@@ -356,6 +358,12 @@ function ServiceProviders() {
     [filteredProviders, isServiceProvider, providers, roleScopedProviders]
   );
 
+  const serviceProviderPaymentDetailsComplete = useMemo(
+    () =>
+      hasCompleteProviderPaymentDetails(serviceProviderProfile?.paymentDetails),
+    [serviceProviderProfile?.paymentDetails]
+  );
+
   const editingProvider = useMemo(
     () =>
       editingProviderId
@@ -377,6 +385,17 @@ function ServiceProviders() {
 
     return `Showing ${filteredProviders.length} of ${roleScopedProviders.length} approved providers`;
   }, [filteredProviders.length, isResident, roleScopedProviders.length]);
+
+  const handleScrollToPaymentInformation = () => {
+    paymentInformationSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+
+    window.setTimeout(() => {
+      bankNameInputRef.current?.focus();
+    }, 250);
+  };
 
   if (loading) {
     return <p>Loading service providers...</p>;
@@ -1113,7 +1132,41 @@ function ServiceProviders() {
           )}
 
           {isServiceProvider && serviceProviderProfile ? (
-            <section className="provider-payment-card">
+            <>
+              {!serviceProviderPaymentDetailsComplete ? (
+                <section
+                  className="provider-payment-reminder"
+                  aria-labelledby="providerPaymentReminderTitle"
+                >
+                  <div className="provider-payment-reminder-copy">
+                    <p
+                      id="providerPaymentReminderTitle"
+                      className="provider-payment-reminder-title"
+                    >
+                      Add your payment details so administrators can process
+                      payments to you.
+                    </p>
+                    <p className="provider-payment-reminder-text">
+                      Complete your bank name, account name, account number, and
+                      preferred payment method in the Payment Information section
+                      below.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleScrollToPaymentInformation}
+                    className="provider-payment-reminder-action"
+                  >
+                    Complete Payment Information
+                  </button>
+                </section>
+              ) : null}
+
+              <section
+                ref={paymentInformationSectionRef}
+                id="provider-payment-information"
+                className="provider-payment-card"
+              >
               <div className="provider-payment-header">
                 <div>
                   <h2>Payment Information</h2>
@@ -1181,6 +1234,7 @@ function ServiceProviders() {
                   <div className="provider-form-field provider-form-group">
                     <label htmlFor="bankName">Bank Name</label>
                     <input
+                      ref={bankNameInputRef}
                       id="bankName"
                       name="bankName"
                       type="text"
@@ -1297,7 +1351,8 @@ function ServiceProviders() {
                   </button>
                 </div>
               </form>
-            </section>
+              </section>
+            </>
           ) : null}
         </>
       )}
@@ -1379,6 +1434,15 @@ function buildPaymentDetailsForm(paymentDetails = {}) {
       paymentDetails.preferredPaymentMethod || "bank_transfer",
     paystackRecipientCode: paymentDetails.paystackRecipientCode || "",
   };
+}
+
+function hasCompleteProviderPaymentDetails(paymentDetails = {}) {
+  return [
+    paymentDetails.bankName,
+    paymentDetails.accountName,
+    paymentDetails.accountNumber,
+    paymentDetails.preferredPaymentMethod,
+  ].every((value) => String(value || "").trim());
 }
 
 function maskAccountNumber(accountNumber = "") {
