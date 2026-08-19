@@ -125,6 +125,8 @@ function Tasks() {
   const editableStatusOptions = isAdmin
     ? adminAllowedStatuses
     : providerAllowedStatuses;
+  const showEditableStatusFieldset =
+    editingTaskId && (isAdmin || isServiceProvider);
 
   const resetForm = () => {
     setFormData({
@@ -394,9 +396,10 @@ function Tasks() {
         const payload = isComplaintPrefillMode
           ? {
               ...formData,
+              status: "pending",
               complaint: complaintContext._id,
             }
-          : { ...formData };
+          : { ...formData, status: "pending" };
 
         await api.post("/api/tasks", payload);
         await fetchPageData();
@@ -942,35 +945,37 @@ function Tasks() {
             </>
           ) : null}
 
-          <fieldset className="task-status-fieldset">
-            <legend className="task-status-legend">Status</legend>
-            <div className="task-status-radio-group">
-              {editableStatusOptions.map((statusOption) => {
-                const inputId = `task-status-${statusOption}`;
+          {showEditableStatusFieldset ? (
+            <fieldset className="task-status-fieldset">
+              <legend className="task-status-legend">Status</legend>
+              <div className="task-status-radio-group">
+                {editableStatusOptions.map((statusOption) => {
+                  const inputId = `task-status-${statusOption}`;
 
-                return (
-                  <label
-                    key={statusOption}
-                    htmlFor={inputId}
-                    className="task-status-radio-option"
-                  >
-                    <input
-                      id={inputId}
-                      type="radio"
-                      name="status"
-                      value={statusOption}
-                      checked={formData.status === statusOption}
-                      onChange={handleChange}
-                      className="task-status-radio-input"
-                    />
-                    <span className="task-status-radio-label">
-                      {formatTaskStatusLabel(statusOption)}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
+                  return (
+                    <label
+                      key={statusOption}
+                      htmlFor={inputId}
+                      className="task-status-radio-option"
+                    >
+                      <input
+                        id={inputId}
+                        type="radio"
+                        name="status"
+                        value={statusOption}
+                        checked={formData.status === statusOption}
+                        onChange={handleChange}
+                        className="task-status-radio-input"
+                      />
+                      <span className="task-status-radio-label">
+                        {formatTaskStatusLabel(statusOption)}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}
 
           {isAdmin ? (
             <div style={{ gridColumn: "1 / -1" }}>
