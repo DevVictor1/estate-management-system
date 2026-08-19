@@ -1014,6 +1014,125 @@ function Payments() {
                 ))}
               </div>
             </section>
+
+            {selectedReceiptIssuePayment ? (
+              <div
+                className="payments-receipt-issue-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="paymentReceiptIssueTitle"
+                onClick={closeReceiptIssueModal}
+              >
+                <div
+                  className="payments-receipt-issue-dialog"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="payments-receipt-issue-header">
+                    <div>
+                      <p className="payments-evidence-eyebrow">Payment Receipt</p>
+                      <h2 id="paymentReceiptIssueTitle">Report Payment Issue</h2>
+                      <p>
+                        {selectedReceiptIssuePayment.contract?.contractTitle ||
+                          "Contract Payment"}{" "}
+                        •{" "}
+                        {currencyFormatter.format(
+                          Number(selectedReceiptIssuePayment.amount) || 0
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="payments-evidence-close"
+                      onClick={closeReceiptIssueModal}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <form
+                    className="payments-receipt-issue-form"
+                    onSubmit={handleReceiptIssueSubmit}
+                  >
+                    <div className="payments-receipt-issue-panel">
+                      <label
+                        className="payments-evidence-label"
+                        htmlFor="paymentIssueReason"
+                      >
+                        Issue Reason
+                      </label>
+                      <select
+                        id="paymentIssueReason"
+                        value={receiptIssueReason}
+                        onChange={(event) =>
+                          setReceiptIssueReason(event.target.value)
+                        }
+                        className="payments-receipt-issue-input"
+                        disabled={receiptIssueSubmitting}
+                      >
+                        {Object.entries(providerReceiptIssueReasonLabels).map(
+                          ([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="payments-receipt-issue-panel">
+                      <label
+                        className="payments-evidence-label"
+                        htmlFor="paymentIssueNote"
+                      >
+                        Short Note{" "}
+                        <span className="payments-receipt-issue-optional">
+                          (Optional)
+                        </span>
+                      </label>
+                      <textarea
+                        id="paymentIssueNote"
+                        value={receiptIssueNote}
+                        onChange={(event) => setReceiptIssueNote(event.target.value)}
+                        className="payments-receipt-issue-textarea"
+                        rows={4}
+                        maxLength={1000}
+                        disabled={receiptIssueSubmitting}
+                        placeholder="Add any brief context about the payment issue."
+                      />
+                    </div>
+
+                    {receiptIssueError ? (
+                      <div
+                        className="payments-form-alert payments-receipt-issue-alert"
+                        role="alert"
+                      >
+                        {receiptIssueError}
+                      </div>
+                    ) : null}
+
+                    <div className="payments-receipt-issue-actions">
+                      <button
+                        type="submit"
+                        className="payments-evidence-primary"
+                        disabled={receiptIssueSubmitting}
+                      >
+                        {receiptIssueSubmitting
+                          ? "Reporting..."
+                          : "Submit Issue"}
+                      </button>
+                      <button
+                        type="button"
+                        className="payments-evidence-secondary"
+                        onClick={closeReceiptIssueModal}
+                        disabled={receiptIssueSubmitting}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
       </section>
@@ -1916,117 +2035,6 @@ function Payments() {
         </div>
       ) : null}
 
-      {isServiceProvider && selectedReceiptIssuePayment ? (
-        <div
-          className="payments-receipt-issue-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Report payment issue"
-          onClick={closeReceiptIssueModal}
-        >
-          <div
-            className="payments-receipt-issue-dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="payments-receipt-issue-header">
-              <div>
-                <p className="payments-evidence-eyebrow">Payment Receipt</p>
-                <h2>Report Payment Issue</h2>
-                <p>
-                  {selectedReceiptIssuePayment.contract?.contractTitle ||
-                    "Contract Payment"}{" "}
-                  •{" "}
-                  {currencyFormatter.format(
-                    Number(selectedReceiptIssuePayment.amount) || 0
-                  )}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="payments-evidence-close"
-                onClick={closeReceiptIssueModal}
-              >
-                Close
-              </button>
-            </div>
-
-            <form
-              className="payments-receipt-issue-form"
-              onSubmit={handleReceiptIssueSubmit}
-            >
-              <div className="payments-receipt-issue-panel">
-                <label
-                  className="payments-evidence-label"
-                  htmlFor="paymentIssueReason"
-                >
-                  Issue Reason
-                </label>
-                <select
-                  id="paymentIssueReason"
-                  value={receiptIssueReason}
-                  onChange={(event) => setReceiptIssueReason(event.target.value)}
-                  className="payments-receipt-issue-input"
-                  disabled={receiptIssueSubmitting}
-                >
-                  {Object.entries(providerReceiptIssueReasonLabels).map(
-                    ([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    )
-                  )}
-                </select>
-              </div>
-
-              <div className="payments-receipt-issue-panel">
-                <label
-                  className="payments-evidence-label"
-                  htmlFor="paymentIssueNote"
-                >
-                  Short Note <span className="payments-receipt-issue-optional">(Optional)</span>
-                </label>
-                <textarea
-                  id="paymentIssueNote"
-                  value={receiptIssueNote}
-                  onChange={(event) => setReceiptIssueNote(event.target.value)}
-                  className="payments-receipt-issue-textarea"
-                  rows={4}
-                  maxLength={1000}
-                  disabled={receiptIssueSubmitting}
-                  placeholder="Add any brief context about the payment issue."
-                />
-              </div>
-
-              {receiptIssueError ? (
-                <div className="payments-form-alert payments-receipt-issue-alert" role="alert">
-                  {receiptIssueError}
-                </div>
-              ) : null}
-
-              <div className="payments-receipt-issue-actions">
-                <button
-                  type="submit"
-                  className="payments-evidence-primary"
-                  disabled={receiptIssueSubmitting}
-                >
-                  {receiptIssueSubmitting
-                    ? "Reporting..."
-                    : "Report Payment Issue"}
-                </button>
-                <button
-                  type="button"
-                  className="payments-evidence-secondary"
-                  onClick={closeReceiptIssueModal}
-                  disabled={receiptIssueSubmitting}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
       {evidencePreview ? (
         <div
           className="payments-evidence-lightbox"
@@ -2176,6 +2184,7 @@ function PaymentReceiptSummary({
   const issueReasonLabel = formatProviderReceiptIssueReason(
     payment?.providerReceipt?.issueReason
   );
+  const hasProviderActions = canConfirmReceipt || canReportIssue;
 
   return (
     <div
@@ -2223,27 +2232,31 @@ function PaymentReceiptSummary({
         </span>
       ) : null}
 
-      {canConfirmReceipt ? (
-        <button
-          type="button"
-          className="payment-receipt-confirm-button"
-          onClick={() => onConfirm?.(payment)}
-          disabled={confirmingPaymentId === payment?._id}
-        >
-          {confirmingPaymentId === payment?._id
-            ? "Confirming..."
-            : "Confirm Payment Received"}
-        </button>
-      ) : null}
+      {hasProviderActions ? (
+        <div className="payment-receipt-summary-actions">
+          {canConfirmReceipt ? (
+            <button
+              type="button"
+              className="payment-receipt-confirm-button"
+              onClick={() => onConfirm?.(payment)}
+              disabled={confirmingPaymentId === payment?._id}
+            >
+              {confirmingPaymentId === payment?._id
+                ? "Confirming..."
+                : "Confirm Payment Received"}
+            </button>
+          ) : null}
 
-      {canReportIssue ? (
-        <button
-          type="button"
-          className="payment-receipt-issue-button"
-          onClick={() => onReportIssue?.(payment)}
-        >
-          Report Payment Issue
-        </button>
+          {canReportIssue ? (
+            <button
+              type="button"
+              className="payment-receipt-issue-button"
+              onClick={() => onReportIssue?.(payment)}
+            >
+              Report Payment Issue
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

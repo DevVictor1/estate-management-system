@@ -70,6 +70,10 @@ const buildPaymentRecordedEmail = ({
   const evidenceMessage = hasPaymentEvidence
     ? "Payment evidence is available in your EstateHub account."
     : "";
+  const receiptConfirmationMessage =
+    String(paymentStatus || "").trim().toLowerCase() === "paid"
+      ? "Please log in to EstateHub to confirm once you have received the funds."
+      : "";
 
   const amountRow = safeAmount
     ? `
@@ -164,6 +168,13 @@ const buildPaymentRecordedEmail = ({
                   )}</p>`
                 : ""
             }
+            ${
+              receiptConfirmationMessage
+                ? `<p style="margin: 0 0 20px; color: #64748b;">${escapeHtml(
+                    receiptConfirmationMessage
+                  )}</p>`
+                : ""
+            }
             <table style="width: 100%; border-collapse: collapse;">
               <tbody>
                 <tr>
@@ -198,6 +209,7 @@ const buildPaymentRecordedEmail = ({
       heading || "A payment has been recorded for your contract.",
       intro || "Log in to EstateHub to review your payment history.",
       ...(evidenceMessage ? [evidenceMessage] : []),
+      ...(receiptConfirmationMessage ? [receiptConfirmationMessage] : []),
       "",
       `Company name: ${companyName || "Not provided"}`,
       `Contract title: ${contractTitle || "Untitled contract"}`,

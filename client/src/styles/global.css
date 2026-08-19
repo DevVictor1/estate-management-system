@@ -3777,7 +3777,7 @@ button:hover {
 .payment-receipt-summary {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -3837,13 +3837,20 @@ button:hover {
   overflow-wrap: anywhere;
 }
 
+.payment-receipt-summary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
 .payment-receipt-confirm-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 8px 12px;
   border: 1px solid rgba(22, 101, 52, 0.18);
   border-radius: 12px;
   background: rgba(220, 252, 231, 0.96);
@@ -3857,8 +3864,8 @@ button:hover {
   align-items: center;
   justify-content: center;
   width: fit-content;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 38px;
+  padding: 8px 12px;
   border: 1px solid rgba(185, 28, 28, 0.18);
   border-radius: 12px;
   background: rgba(254, 242, 242, 0.96);
@@ -5925,6 +5932,11 @@ button:hover {
 
   .payment-receipt-issue-button {
     width: 100%;
+  }
+
+  .payment-receipt-summary-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .payments-evidence-header,
