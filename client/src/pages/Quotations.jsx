@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 
@@ -120,6 +121,7 @@ function Quotations() {
   const isServiceProvider = user?.role === "service_provider";
   const [quotations, setQuotations] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [providerProfiles, setProviderProfiles] = useState([]);
   const [selectedQuotationId, setSelectedQuotationId] = useState("");
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [quotationForm, setQuotationForm] = useState(initialQuotationForm);
@@ -194,16 +196,19 @@ function Quotations() {
       setPageError("");
 
       if (isServiceProvider) {
-        const [quotationsResponse, tasksResponse] = await Promise.all([
+        const [quotationsResponse, tasksResponse, providersResponse] = await Promise.all([
           api.get("/api/quotations"),
           api.get("/api/tasks"),
+          api.get("/api/service-providers"),
         ]);
 
         const fetchedQuotations = quotationsResponse.data.data || [];
         const fetchedTasks = tasksResponse.data.data || [];
+        const fetchedProviders = providersResponse.data.data || [];
 
         setQuotations(fetchedQuotations);
         setTasks(fetchedTasks);
+        setProviderProfiles(fetchedProviders);
         setSelectedQuotationId((currentId) =>
           fetchedQuotations.some((quotation) => quotation._id === currentId)
             ? currentId
@@ -214,6 +219,7 @@ function Quotations() {
         const fetchedQuotations = response.data.data || [];
 
         setQuotations(fetchedQuotations);
+        setProviderProfiles([]);
         setSelectedQuotationId((currentId) =>
           fetchedQuotations.some((quotation) => quotation._id === currentId)
             ? currentId
@@ -414,6 +420,17 @@ function Quotations() {
 
     return labourCost + materialsCost + otherCost;
   }, [quotationForm.labourCost, quotationForm.materialsCost, quotationForm.otherCost]);
+
+  const serviceProviderProfile = useMemo(
+    () => (isServiceProvider ? providerProfiles[0] || null : null),
+    [isServiceProvider, providerProfiles]
+  );
+
+  const serviceProviderPaymentDetailsComplete = useMemo(
+    () =>
+      hasCompleteProviderPaymentDetails(serviceProviderProfile?.paymentDetails),
+    [serviceProviderProfile?.paymentDetails]
+  );
 
   const applyQuotationPrefill = (quotation) => {
     if (!quotation) {
@@ -668,6 +685,31 @@ function Quotations() {
                 <strong>{formatCurrency(liveQuotationTotal)}</strong>
               </div>
             </div>
+
+            {!serviceProviderPaymentDetailsComplete ? (
+              <div
+                className="quotation-payment-reminder"
+                role="note"
+                aria-label="Payment information reminder"
+              >
+                <div className="quotation-payment-reminder-copy">
+                  <strong className="quotation-payment-reminder-title">
+                    Add your payment details so administrators can process
+                    payments to you after approved work.
+                  </strong>
+                  <p className="quotation-payment-reminder-text">
+                    Complete your bank name, account name, account number, and
+                    preferred payment method in your Payment Information section.
+                  </p>
+                </div>
+                <Link
+                  to="/service-providers#provider-payment-information"
+                  className="quotation-payment-reminder-action"
+                >
+                  Complete Payment Information
+                </Link>
+              </div>
+            ) : null}
 
             {formError ? (
               <div className="quotation-form-alert" role="alert">
@@ -1321,3 +1363,12 @@ function Quotations() {
 }
 
 export default Quotations;
+
+function hasCompleteProviderPaymentDetails(paymentDetails = {}) {
+  return [
+    paymentDetails.bankName,
+    paymentDetails.accountName,
+    paymentDetails.accountNumber,
+    paymentDetails.preferredPaymentMethod,
+  ].every((value) => String(value || "").trim());
+}
