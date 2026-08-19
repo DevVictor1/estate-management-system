@@ -91,6 +91,8 @@ function Payments() {
   const [formError, setFormError] = useState("");
   const [warning, setWarning] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [copiedProviderAccountFeedback, setCopiedProviderAccountFeedback] =
+    useState("");
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
   const [evidenceModalPaymentId, setEvidenceModalPaymentId] = useState("");
@@ -228,6 +230,27 @@ function Payments() {
     [contracts, formData.contract]
   );
 
+  const selectedProvider = useMemo(
+    () =>
+      providers.find((provider) => provider._id === formData.serviceProvider) ||
+      null,
+    [providers, formData.serviceProvider]
+  );
+
+  const selectedProviderPaymentDetails = selectedProvider?.paymentDetails || null;
+  const selectedProviderHasPaymentDetails = Boolean(
+    selectedProviderPaymentDetails &&
+      (
+        selectedProviderPaymentDetails.bankName ||
+        selectedProviderPaymentDetails.accountName ||
+        selectedProviderPaymentDetails.accountNumber ||
+        selectedProviderPaymentDetails.accountType ||
+        selectedProviderPaymentDetails.preferredPaymentMethod ||
+        selectedProviderPaymentDetails.paystackRecipientCode ||
+        selectedProviderPaymentDetails.updatedAt
+      )
+  );
+
   const selectedContractSummary = selectedContract?.financialSummary;
 
   const handleEdit = (payment) => {
@@ -264,6 +287,10 @@ function Payments() {
     }
 
     if (name === "serviceProvider") {
+      if (copiedProviderAccountFeedback) {
+        setCopiedProviderAccountFeedback("");
+      }
+
       setFormData((currentData) => {
         const contractStillMatches = contracts.find(
           (contract) =>
@@ -296,6 +323,26 @@ function Payments() {
       ...currentData,
       [name]: value,
     }));
+  };
+
+  const handleCopyProviderAccountNumber = async (accountNumber) => {
+    if (!accountNumber) {
+      setCopiedProviderAccountFeedback("No account number available to copy.");
+      return;
+    }
+
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+
+      await navigator.clipboard.writeText(accountNumber);
+      setCopiedProviderAccountFeedback("Account number copied.");
+    } catch (copyError) {
+      setCopiedProviderAccountFeedback(
+        "Unable to copy the account number right now."
+      );
+    }
   };
 
   const handleDelete = async (paymentId) => {
@@ -1023,6 +1070,97 @@ function Payments() {
             </select>
           </div>
 
+          {selectedProvider ? (
+            <div className="payments-provider-details" style={{ gridColumn: "1 / -1" }}>
+              <div className="payments-provider-details-header">
+                <div>
+                  <strong className="payments-provider-details-title">
+                    Provider Payment Details
+                  </strong>
+                  <p className="payments-provider-details-subtitle">
+                    Saved account information for {selectedProvider.companyName}.
+                  </p>
+                </div>
+
+                {selectedProviderPaymentDetails?.accountNumber ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopyProviderAccountNumber(
+                        selectedProviderPaymentDetails.accountNumber
+                      )
+                    }
+                    className="payments-provider-copy-button"
+                  >
+                    Copy Account Number
+                  </button>
+                ) : null}
+              </div>
+
+              {copiedProviderAccountFeedback ? (
+                <p className="payments-provider-copy-feedback" role="status">
+                  {copiedProviderAccountFeedback}
+                </p>
+              ) : null}
+
+              {selectedProviderHasPaymentDetails ? (
+                <div className="payments-provider-details-grid">
+                  <SummaryItem
+                    label="Bank Name"
+                    value={selectedProviderPaymentDetails.bankName || "Not provided"}
+                  />
+                  <SummaryItem
+                    label="Account Name"
+                    value={
+                      selectedProviderPaymentDetails.accountName || "Not provided"
+                    }
+                  />
+                  <SummaryItem
+                    label="Account Number"
+                    value={
+                      selectedProviderPaymentDetails.accountNumber || "Not provided"
+                    }
+                  />
+                  <SummaryItem
+                    label="Account Type"
+                    value={
+                      formatPaymentDetailLabel(
+                        selectedProviderPaymentDetails.accountType
+                      ) || "Not provided"
+                    }
+                  />
+                  <SummaryItem
+                    label="Preferred Payment Method"
+                    value={
+                      formatPaymentDetailLabel(
+                        selectedProviderPaymentDetails.preferredPaymentMethod
+                      ) || "Not provided"
+                    }
+                  />
+                  <SummaryItem
+                    label="Paystack Recipient Code"
+                    value={
+                      selectedProviderPaymentDetails.paystackRecipientCode ||
+                      "Not provided"
+                    }
+                  />
+                  <SummaryItem
+                    label="Last Updated"
+                    value={
+                      selectedProviderPaymentDetails.updatedAt
+                        ? formatPaymentDate(selectedProviderPaymentDetails.updatedAt)
+                        : "Not provided"
+                    }
+                  />
+                </div>
+              ) : (
+                <div className="payments-provider-details-empty">
+                  This provider has not added payment details yet.
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <div>
             <label
               htmlFor="contract"
@@ -1745,6 +1883,18 @@ function formatFileSize(size) {
   }
 
   return `${safeSize} B`;
+}
+
+function formatPaymentDetailLabel(value = "") {
+  if (!value) {
+    return "";
+  }
+
+  return String(value)
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function renderProviderEvidenceCell(payment, { onPreviewImage }) {

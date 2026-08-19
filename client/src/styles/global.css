@@ -3440,6 +3440,86 @@ button:hover {
   word-break: break-word;
 }
 
+.payments-provider-details {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.payments-provider-details-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.payments-provider-details-title {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.payments-provider-details-subtitle {
+  margin-top: 6px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.payments-provider-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+
+.payments-provider-details-grid > div {
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.payments-provider-details-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.payments-provider-details-empty {
+  padding: 14px 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.26);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.payments-provider-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 12px;
+  background: #ffffff;
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.payments-provider-copy-feedback {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
 .payments-feedback {
   margin-bottom: 16px;
   padding: 12px 14px;
@@ -5449,6 +5529,20 @@ button:hover {
 
   .payments-evidence-current {
     grid-template-columns: 1fr;
+  }
+
+  .payments-provider-details {
+    padding: 16px;
+  }
+
+  .payments-provider-details-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .payments-provider-details-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .payments-evidence-thumbnail {
