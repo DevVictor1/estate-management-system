@@ -363,11 +363,17 @@ function LandingPage() {
           </div>
         </section>
 
-        <section className="landing-section landing-trust-section">
+        <section id="about" className="landing-section landing-trust-section">
           <div className="landing-section-shell landing-trust-shell">
             <div className="landing-trust-intro">
               <p className="landing-eyebrow">Why EstateHub</p>
               <h2>Practical controls for a process that usually gets fragmented</h2>
+              <p>
+                EstateHub centralizes service-provider and contractor
+                operations for residential communities so complaints, task
+                delivery, quotation review, contract tracking, and payment
+                records stay connected in one working system.
+              </p>
             </div>
 
             <div className="landing-trust-grid">
@@ -382,21 +388,6 @@ function LandingPage() {
                   </div>
                 </article>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="about" className="landing-section landing-about-section">
-          <div className="landing-section-shell">
-            <div className="landing-about-copy">
-              <p className="landing-eyebrow">About EstateHub</p>
-              <h2>EstateHub centralizes service-provider and contractor operations for residential communities</h2>
-              <p>
-                It is a web-based management platform focused on accountability,
-                communication, and operational clarity across complaints, task
-                delivery, quotation review, contract tracking, and payment
-                records.
-              </p>
             </div>
           </div>
         </section>

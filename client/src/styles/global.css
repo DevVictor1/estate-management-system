@@ -633,7 +633,7 @@ button:hover {
 
 .landing-hero {
   padding-top: 38px;
-  padding-bottom: 54px;
+  padding-bottom: 42px;
 }
 
 .landing-hero-shell {
@@ -681,21 +681,29 @@ button:hover {
 .landing-hero-highlights {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 28px;
+  column-gap: 0;
+  row-gap: 6px;
+  margin-top: 24px;
+  color: rgba(226, 234, 244, 0.78);
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .landing-hero-highlights span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 36px;
-  padding: 8px 14px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 999px;
-  color: rgba(226, 234, 244, 0.88);
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 0.92rem;
-  font-weight: 600;
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.landing-hero-highlights span:not(:last-child)::after {
+  content: "·";
+  margin: 0 10px;
+  color: rgba(138, 180, 255, 0.68);
 }
 
 .landing-hero-note {
@@ -773,7 +781,7 @@ button:hover {
 
 .landing-workflow-section {
   padding-top: 12px;
-  padding-bottom: 26px;
+  padding-bottom: 18px;
 }
 
 .landing-workflow-heading {
@@ -825,8 +833,8 @@ button:hover {
 }
 
 .landing-story-section {
-  padding-top: 42px;
-  padding-bottom: 42px;
+  padding-top: 32px;
+  padding-bottom: 34px;
 }
 
 .landing-story-section-alt {
@@ -922,12 +930,21 @@ button:hover {
 }
 
 .landing-role-section {
-  padding-top: 48px;
+  padding-top: 40px;
   padding-bottom: 40px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
 }
 
 .landing-role-heading {
   margin-bottom: 22px;
+}
+
+.landing-role-section .landing-eyebrow {
+  color: #2563eb;
+}
+
+.landing-role-section .landing-section-heading h2 {
+  color: #0f2342;
 }
 
 .landing-role-grid {
@@ -939,7 +956,7 @@ button:hover {
 
 .landing-role-column {
   padding-top: 20px;
-  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  border-top: 1px solid rgba(37, 99, 235, 0.14);
 }
 
 .landing-role-column h3,
@@ -952,6 +969,7 @@ button:hover {
   font-size: 1.1rem;
   font-weight: 740;
   letter-spacing: -0.02em;
+  color: #0f2342;
 }
 
 .landing-role-list {
@@ -971,16 +989,17 @@ button:hover {
 .landing-role-list li svg {
   flex: 0 0 auto;
   margin-top: 5px;
-  color: #8ab4ff;
+  color: #2563eb;
   font-size: 0.86rem;
 }
 
 .landing-role-list span {
   margin: 0;
+  color: rgba(20, 33, 61, 0.78);
 }
 
 .landing-trust-section {
-  padding-top: 34px;
+  padding-top: 28px;
   padding-bottom: 42px;
 }
 
@@ -995,6 +1014,16 @@ button:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px 26px;
+}
+
+.landing-trust-intro {
+  max-width: 540px;
+}
+
+.landing-trust-intro p:last-child {
+  margin-top: 18px;
+  color: rgba(216, 228, 243, 0.76);
+  line-height: 1.75;
 }
 
 .landing-trust-item {
@@ -1017,21 +1046,12 @@ button:hover {
   font-size: 0.86rem;
 }
 
-.landing-about-section {
-  padding-top: 42px;
-  padding-bottom: 38px;
-}
-
-.landing-about-copy {
-  max-width: 760px;
-}
-
 .landing-cta-panel {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 28px;
-  padding: 32px 0 0;
+  padding: 26px 0 0;
   border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
@@ -5227,6 +5247,7 @@ button:hover {
 
   .landing-hero {
     padding-top: 28px;
+    padding-bottom: 34px;
   }
 
   .landing-brand-copy span {
@@ -5272,6 +5293,11 @@ button:hover {
 
   .landing-workflow-step {
     justify-content: flex-start;
+  }
+
+  .landing-role-section {
+    padding-top: 34px;
+    padding-bottom: 34px;
   }
 
   .landing-hero-actions,
