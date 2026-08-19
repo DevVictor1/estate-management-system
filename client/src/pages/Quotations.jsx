@@ -143,6 +143,8 @@ function Quotations() {
   const [feedback, setFeedback] = useState(null);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const quotationDetailSectionRef = useRef(null);
+  const shouldScrollToDetailRef = useRef(false);
 
   const extractErrorMessage = (error, fallbackMessage) =>
     error?.response?.data?.message ||
@@ -287,6 +289,27 @@ function Quotations() {
       isMounted = false;
     };
   }, [selectedQuotationId]);
+
+  useEffect(() => {
+    if (
+      !shouldScrollToDetailRef.current ||
+      detailLoading ||
+      detailError ||
+      !selectedQuotation
+    ) {
+      return;
+    }
+
+    const detailSection = quotationDetailSectionRef.current;
+
+    if (!detailSection) {
+      return;
+    }
+
+    shouldScrollToDetailRef.current = false;
+    detailSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    detailSection.focus({ preventScroll: true });
+  }, [detailError, detailLoading, selectedQuotation]);
 
   const latestQuotationByTaskProvider = useMemo(() => {
     const sortedQuotations = [...quotations].sort((firstQuotation, secondQuotation) => {
@@ -533,6 +556,20 @@ function Quotations() {
 
   const handleOpenDetails = (quotationId) => {
     setDetailError("");
+    shouldScrollToDetailRef.current = true;
+
+    if (selectedQuotationId === quotationId && selectedQuotation) {
+      const detailSection = quotationDetailSectionRef.current;
+
+      if (detailSection) {
+        detailSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        detailSection.focus({ preventScroll: true });
+      }
+
+      shouldScrollToDetailRef.current = false;
+      return;
+    }
+
     setSelectedQuotationId(quotationId);
   };
 
@@ -1134,7 +1171,11 @@ function Quotations() {
         ) : null}
       </section>
 
-      <section className="quotation-detail-card">
+      <section
+        ref={quotationDetailSectionRef}
+        className="quotation-detail-card"
+        tabIndex={-1}
+      >
         <div className="quotation-detail-header">
           <div>
             <h2>Quotation Details</h2>

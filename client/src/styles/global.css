@@ -2834,6 +2834,10 @@ button:hover {
   box-shadow: var(--shadow-soft);
 }
 
+.quotation-detail-card {
+  scroll-margin-top: 112px;
+}
+
 .service-providers-page .provider-payment-reminder {
   display: flex;
   align-items: center;
