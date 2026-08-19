@@ -19,6 +19,13 @@ const initialFormData = {
 };
 
 const providerAllowedStatuses = ["pending", "in_progress", "completed"];
+const adminAllowedStatuses = [
+  "pending",
+  "in_progress",
+  "completed",
+  "overdue",
+  "cancelled",
+];
 
 const initialTaskFilters = {
   searchTerm: "",
@@ -53,6 +60,13 @@ const formatFileSize = (sizeInBytes = 0) => {
 
 const getTaskComplaintAttachments = (task) =>
   Array.isArray(task?.complaint?.attachments) ? task.complaint.attachments : [];
+
+const formatTaskStatusLabel = (status = "") =>
+  String(status || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 function Tasks() {
   const location = useLocation();
@@ -108,6 +122,9 @@ function Tasks() {
   );
 
   const visibleTasks = isServiceProvider ? serviceProviderTasks : tasks;
+  const editableStatusOptions = isAdmin
+    ? adminAllowedStatuses
+    : providerAllowedStatuses;
 
   const resetForm = () => {
     setFormData({
@@ -925,36 +942,35 @@ function Tasks() {
             </>
           ) : null}
 
-          <div>
-            <label
-              htmlFor="status"
-              style={{
-                display: "block",
-                marginBottom: "8px",
-                fontWeight: "600",
-              }}
-            >
-              Status
-            </label>
-            <select
-              id="status"
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              required
-              style={inputStyle}
-            >
-              <option value="pending">Pending</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
-              {isAdmin ? (
-                <>
-                  <option value="overdue">Overdue</option>
-                  <option value="cancelled">Cancelled</option>
-                </>
-              ) : null}
-            </select>
-          </div>
+          <fieldset className="task-status-fieldset">
+            <legend className="task-status-legend">Status</legend>
+            <div className="task-status-radio-group">
+              {editableStatusOptions.map((statusOption) => {
+                const inputId = `task-status-${statusOption}`;
+
+                return (
+                  <label
+                    key={statusOption}
+                    htmlFor={inputId}
+                    className="task-status-radio-option"
+                  >
+                    <input
+                      id={inputId}
+                      type="radio"
+                      name="status"
+                      value={statusOption}
+                      checked={formData.status === statusOption}
+                      onChange={handleChange}
+                      className="task-status-radio-input"
+                    />
+                    <span className="task-status-radio-label">
+                      {formatTaskStatusLabel(statusOption)}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           {isAdmin ? (
             <div style={{ gridColumn: "1 / -1" }}>

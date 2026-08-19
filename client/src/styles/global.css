@@ -2003,6 +2003,59 @@ button:hover {
   white-space: nowrap;
 }
 
+.tasks-page .task-status-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tasks-page .task-status-legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+  color: #14213d;
+}
+
+.tasks-page .task-status-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.tasks-page .task-status-radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid rgba(217, 226, 236, 0.95);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #14213d;
+  cursor: pointer;
+}
+
+.tasks-page .task-status-radio-input {
+  margin: 0;
+  accent-color: #0b1f3a;
+}
+
+.tasks-page .task-status-radio-label {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tasks-page .task-status-radio-option:has(.task-status-radio-input:checked) {
+  border-color: rgba(11, 31, 58, 0.3);
+  background: rgba(241, 245, 249, 0.96);
+}
+
+.tasks-page .task-status-radio-option:has(.task-status-radio-input:focus-visible) {
+  outline: 2px solid rgba(37, 99, 235, 0.28);
+  outline-offset: 2px;
+}
+
 .tasks-page .task-action-button {
   flex: 0 0 auto;
 }
@@ -5523,6 +5576,15 @@ button:hover {
   .dashboard-hero,
   .dashboard-section-card {
     padding: 22px 18px;
+  }
+
+  .tasks-page .task-status-radio-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tasks-page .task-status-radio-option {
+    width: 100%;
   }
 
   .dashboard-stat-value {
